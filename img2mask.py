@@ -427,7 +427,7 @@ def img2mask(img, **kwargs):
     """define axis and corresponding figure it falls under:"""
     fig1, ax1 = plt.subplots()
     """load image onto the axis"""
-    ax1.imshow(img, plt.set_cmap("Greys_r"))
+    ax1.imshow(img, cmap = plt.cm.gray)
 
     """preventing plot from rescaling image:"""
     ax1.set_xlim([0.0, img.shape[1]])
@@ -448,9 +448,15 @@ def img2mask(img, **kwargs):
 
 if __name__ == '__main__':
 
-    img = np.load('cinedata/cinedata_1.npy')
+    zslice = 7
+    tslice = 1
+
+    img_ori = np.load('cinedata/cinedata_1.npy')
+    img = img_ori[:, :, tslice, zslice]
+
+    print(img.shape)
 
     position = [(250,250), (180,180), (200, 200)]
 
-    mask1 = img2mask(img, mask = None)
+    mask1 = img2mask(img)
     mask2 = img2mask(img, mask = None)
