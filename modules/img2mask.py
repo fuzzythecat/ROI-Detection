@@ -4,7 +4,6 @@
 # Details of Change :
 
 import numpy as np
-import scipy
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.lines import Line2D
@@ -47,6 +46,7 @@ class ClickerClass(object):
         self.set_modes()
         self.connect_activity()
         plt.show()
+        #self.ax1.get_figure().show()
 
     def set_modes(self):
         if self.img is None:
@@ -225,8 +225,16 @@ class ClickerClass(object):
 
         self.update_mask()
 
+        print ("mask updated")
+
+        import time
+        time.sleep(2)
+
+        plt.close(self.ax2.get_figure())
+        plt.close(self.ax1.get_figure())
+
     def update_mask(self):
-        self.ax2.imshow(self.mask, plt.set_cmap("Greys_r"))
+        self.ax2.imshow(self.mask, cmap = plt.cm.gray)
         self.canvas2.draw()
 
     def switch_vis(self):
@@ -446,15 +454,39 @@ def img2mask(img, **kwargs):
     return cc.mask
 
 if __name__ == '__main__':
+    import sys
+    sys.path.append("../utils")
+
+    import conf
+    import file_handler as fh
 
     zslice = 7
     tslice = 1
 
-    img_ori = np.load('cinedata/cinedata_1.npy')
+    file_path = fh.load_file_npy()
+
+    img_ori = np.load(file_path[0])
     img = img_ori[:, :, tslice, zslice]
 
     print(img.shape)
 
     position = [(250,250), (180,180), (200, 200)]
 
-    mask1 = img2mask(img, mask = None)
+    mask = img2mask(img, mask = None)
+
+    """define axis and corresponding figure it falls under:"""
+    fig1, ax1 = plt.subplots()
+    """load image onto the axis"""
+    ax1.imshow(mask, cmap = plt.cm.gray)
+
+    """preventing plot from rescaling image:"""
+    ax1.set_xlim([0.0, mask.shape[1]])
+    ax1.set_ylim([mask.shape[0], 0.0])
+    ax1.autoscale = False
+
+    """preventing plot from clearing image:"""
+    ax1.hold(True)
+    plt.show()
+
+
+    print("mask complete")
