@@ -10,6 +10,8 @@ from matplotlib.lines import Line2D
 from matplotlib.mlab import dist_point_to_segment
 from copy import deepcopy
 
+import warnings
+
 
 class ClickerClass(object):
 
@@ -28,7 +30,7 @@ class ClickerClass(object):
         self.ax1 = ax1
         self.ax2 = ax2
         self.canvas1 = self.ax1.get_figure().canvas
-        self.canvas2 = self.ax2.get_figure().canvas
+        # self.canvas2 = self.ax2.get_figure().canvas
 
         self.img = img
         self.mask = kwargs.pop('mask', None)
@@ -45,8 +47,9 @@ class ClickerClass(object):
 
         self.set_modes()
         self.connect_activity()
+        #plt.ion()
+        #plt.pause(10)
         plt.show()
-        #self.ax1.get_figure().show()
 
     def set_modes(self):
         if self.img is None:
@@ -134,12 +137,12 @@ class ClickerClass(object):
         self.plot.set_data([],[])
 
     def connect_activity(self):
-        self.canvas1.mpl_connect('button_press_event',  self.button_press_callback)
-        self.canvas1.mpl_connect('button_release_event', self.button_release_callback)
-        self.canvas1.mpl_connect('scroll_event', self.scroll_callback)
-        self.canvas1.mpl_connect('motion_notify_event', self.motion_notify_callback)
-        self.canvas1.mpl_connect('draw_event', self.draw_callback)
-        self.canvas1.mpl_connect('key_press_event', self.key_press_callback)
+        self.cid1 = self.canvas1.mpl_connect('button_press_event',  self.button_press_callback)
+        self.cid2 = self.canvas1.mpl_connect('button_release_event', self.button_release_callback)
+        self.cid3 = self.canvas1.mpl_connect('scroll_event', self.scroll_callback)
+        self.cid4 = self.canvas1.mpl_connect('motion_notify_event', self.motion_notify_callback)
+        self.cid5 = self.canvas1.mpl_connect('draw_event', self.draw_callback)
+        self.cid6 = self.canvas1.mpl_connect('key_press_event', self.key_press_callback)
 
     def button_press_callback(self, event):
         if not self.showverts: return
@@ -223,19 +226,22 @@ class ClickerClass(object):
                 else:
                     self.mask[y][x] = 0
 
-        self.update_mask()
+        #self.update_mask()
+        #plt.close(self.ax1.get_figure())
 
+        fig2, ax2 = plt.subplots()
+        ax2.imshow(self.mask, cmap = plt.cm.gray)
+        plt.ion()
+        plt.pause(2)
         print ("mask updated")
 
-        import time
-        time.sleep(2)
-
-        plt.close(self.ax2.get_figure())
+        plt.close(fig2)
         plt.close(self.ax1.get_figure())
-
+    '''
     def update_mask(self):
         self.ax2.imshow(self.mask, cmap = plt.cm.gray)
         self.canvas2.draw()
+    '''
 
     def switch_vis(self):
         if self.modes:
@@ -444,13 +450,15 @@ def img2mask(img, **kwargs):
     """preventing plot from clearing image:"""
     ax1.hold(True)
 
+    '''
     fig2, ax2 = plt.subplots()
     ax2.set_xlim([0.0, img.shape[1]])
     ax2.set_ylim([img.shape[0], 0.0])
     ax2.autoscale = False
     ax2.hold(True)
+    '''
 
-    cc = ClickerClass(deepcopy(img), ax1, ax2, mask = mask, position = position)
+    cc = ClickerClass(deepcopy(img), ax1, None, mask = mask, position = position)
     return cc.mask
 
 if __name__ == '__main__':
@@ -463,6 +471,8 @@ if __name__ == '__main__':
     zslice = 7
     tslice = 1
 
+    warnings.filterwarnings("ignore")
+
     file_path = fh.load_file_npy()
 
     img_ori = np.load(file_path[0])
@@ -474,19 +484,17 @@ if __name__ == '__main__':
 
     mask = img2mask(img, mask = None)
 
-    """define axis and corresponding figure it falls under:"""
+    """define axis and corresponding figure it falls under:
     fig1, ax1 = plt.subplots()
-    """load image onto the axis"""
     ax1.imshow(mask, cmap = plt.cm.gray)
 
-    """preventing plot from rescaling image:"""
     ax1.set_xlim([0.0, mask.shape[1]])
     ax1.set_ylim([mask.shape[0], 0.0])
     ax1.autoscale = False
 
-    """preventing plot from clearing image:"""
     ax1.hold(True)
     plt.show()
+    """
 
 
     print("mask complete")
