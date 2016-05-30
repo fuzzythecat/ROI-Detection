@@ -4,6 +4,9 @@
 # Details of Change :
 
 import numpy as np
+from matplotlib import use
+use("Qt5Agg")
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.lines import Line2D
@@ -15,6 +18,7 @@ import warnings
 
 class ClickerClass(object):
 
+    _ind = None
     showverts = True
     epsilon = 5
     modes = True # True: Place Landmarks False: Connect Landmarks
@@ -22,59 +26,73 @@ class ClickerClass(object):
                     "Press 'm' to switch modes",
              False: "'i': insert, 't': toggle vertex, 'RIGHT': delete\n"
                      "Press 'Enter' to crop, 'm' to switch modes"}
-    number_of_verticies_for_calib = 20
     alpha = 0.30
 
-    def __init__(self, img, ax1, ax2, **kwargs):
+    number_of_verticies_for_calib = 20
+    subplotnum = 0
 
-        self.ax1 = ax1
-        self.ax2 = ax2
-        self.canvas1 = self.ax1.get_figure().canvas
-        # self.canvas2 = self.ax2.get_figure().canvas
+
+    def __init__(self, img, **kwargs):
+
+        self.ax1 = kwargs.pop('ax1', None)
+        self.ax2 = kwargs.pop('ax2', None)
+
+        if self.ax1 is not None:
+            self.fig1 = self.ax1.get_figure()
+            self.canvas1 = self.fig1.canvas
+        if self.ax2 is not None:
+            self.fig2 = self.ax2.get_figure()
+            self.canvas2 = self.fig2.canvas
+        else:
+            self.fig2 = None
+            self.canvas2 = None
 
         self.img = img
         self.mask = kwargs.pop('mask', None)
         self.verts = kwargs.pop('position', [])
 
-        self.covered_pixels = []
-
-        self._ind = None # the active vertex
-
-        self.plot = ax1.plot([], [], marker='o', markerfacecolor='b',
-                              linestyle='none', markersize = 5)[0]
         self.line = None
         self.poly = None
+        self.background = None
+
+        self.covered_pixels = []
+
+        self.plot = self.ax1.plot([], [], marker='o', markerfacecolor='b',
+                              linestyle='none', markersize = 5)[0]
 
         self.set_modes()
         self.connect_activity()
-        #plt.ion()
-        #plt.pause(10)
+
         plt.show()
 
     def set_modes(self):
         if self.img is None:
-            raise AttributeError("User must provide numpy.ndarray image")
+            raise AttributeError("User must provide <numpy.ndarray> image")
         if not self.verts:
             self.verts = []
 
+        """if position provided"""
         if len(self.verts) > 0:
             self.plot_init()
             self.switch_modes()
             if self.mask is not None:
+                """position and mask provided"""
                 self.update_mask()
         elif self.mask is not None:
+            """only mask provided"""
             self.mask_init()
         else:
+            """position and mask not provided"""
             self.plot_init()
 
         if self.mask is None:
-            self.mask = self.img
+            self.mask = np.zeros((self.img.shape[0], self.img.shape[1]))
         self.canvas1.draw()
 
     def mask_init(self):
         self.auto_calibration()
         self.poly_init()
-        self.update_mask()
+        self.update_msk()
 
     def plot_init(self):
         self.ax1.set_title(self.title[True])
@@ -137,12 +155,13 @@ class ClickerClass(object):
         self.plot.set_data([],[])
 
     def connect_activity(self):
-        self.cid1 = self.canvas1.mpl_connect('button_press_event',  self.button_press_callback)
-        self.cid2 = self.canvas1.mpl_connect('button_release_event', self.button_release_callback)
-        self.cid3 = self.canvas1.mpl_connect('scroll_event', self.scroll_callback)
-        self.cid4 = self.canvas1.mpl_connect('motion_notify_event', self.motion_notify_callback)
-        self.cid5 = self.canvas1.mpl_connect('draw_event', self.draw_callback)
-        self.cid6 = self.canvas1.mpl_connect('key_press_event', self.key_press_callback)
+        self.canvas1.mpl_connect('button_press_event',  self.button_press_callback)
+        self.canvas1.mpl_connect('button_release_event', self.button_release_callback)
+        self.canvas1.mpl_connect('scroll_event', self.scroll_callback)
+        self.canvas1.mpl_connect('motion_notify_event', self.motion_notify_callback)
+        self.canvas1.mpl_connect('draw_event', self.draw_callback)
+        self.canvas1.mpl_connect('key_press_event', self.key_press_callback)
+
 
     def button_press_callback(self, event):
         if not self.showverts: return
@@ -226,22 +245,40 @@ class ClickerClass(object):
                 else:
                     self.mask[y][x] = 0
 
-        #self.update_mask()
-        #plt.close(self.ax1.get_figure())
+        if self.fig2:
+            self.update_mask()
+        else:
+            self.create_mask_fig()
 
+        '''
         fig2, ax2 = plt.subplots()
         ax2.imshow(self.mask, cmap = plt.cm.gray)
+
         plt.ion()
         plt.pause(2)
+        plt.close(fig2)
         print ("mask updated")
 
-        plt.close(fig2)
         plt.close(self.ax1.get_figure())
-    '''
+        '''
+
+    def create_mask_fig(self):
+        self.fig2 = plt.figure()
+        self.canvas2 = self.fig2.canvas
+        self.ax2 = self.fig2.add_subplot(1, 1, 1)
+        self.ax2.imshow(self.mask, cmap=plt.cm.gray)
+        self.fig2.show()
+
+        self.canvas2.mpl_connect('close_event', self.close_callback)
+
+    def close_callback(self, event):
+        self.fig2 = None
+        self.canvas2 = None
+
     def update_mask(self):
-        self.ax2.imshow(self.mask, cmap = plt.cm.gray)
-        self.canvas2.draw()
-    '''
+        if self.fig2 is not None:
+            self.ax2.imshow(self.mask, cmap = plt.cm.gray)
+            self.canvas2.draw()
 
     def switch_vis(self):
         if self.modes:
@@ -425,46 +462,40 @@ class ClickerClass(object):
 
 def img2mask(img, **kwargs):
 
-    mask = None
-    position = None
-
     if img is None:
-        raise AttributeError("User must provide numpy.ndarray image")
-    tmask = kwargs.pop("mask", None)
-    tposition = kwargs.pop("position", None)
-    if tmask is not None:
-        mask = deepcopy(tmask)
-    if tposition is not None:
-        position = deepcopy(tposition)
+        raise AttributeError("User must provide <numpy.ndarray> image")
 
-    """define axis and corresponding figure it falls under:"""
+    mask = deepcopy(kwargs.pop("mask", None))
+    position = deepcopy(kwargs.pop("position", None))
+
+    """define axis and corresponding figure img falls under"""
     fig1, ax1 = plt.subplots()
     """load image onto the axis"""
     ax1.imshow(img, cmap = plt.cm.gray)
-
-    """preventing plot from rescaling image:"""
+    """preventing plot from rescaling image"""
     ax1.set_xlim([0.0, img.shape[1]])
     ax1.set_ylim([img.shape[0], 0.0])
     ax1.autoscale = False
-
-    """preventing plot from clearing image:"""
+    """preventing plot from clearing image"""
     ax1.hold(True)
 
-    '''
-    fig2, ax2 = plt.subplots()
-    ax2.set_xlim([0.0, img.shape[1]])
-    ax2.set_ylim([img.shape[0], 0.0])
-    ax2.autoscale = False
-    ax2.hold(True)
-    '''
+    """if mask provided, prepare second figure"""
+    fig2, ax2 = None, None
+    if mask is not None:
+        fig2, ax2 = plt.subplots()
+        ax2.set_xlim([0.0, mask.shape[1]])
+        ax2.set_ylim([mask.shape[0], 0.0])
+        ax2.autoscale = False
+        ax2.hold(True)
 
-    cc = ClickerClass(deepcopy(img), ax1, None, mask = mask, position = position)
-    return cc.mask
+    return ClickerClass(deepcopy(img), ax1=ax1, ax2=ax2, \
+                        mask=mask, position=position).mask
 
 if __name__ == '__main__':
     import sys
     sys.path.append("../utils")
 
+    import os
     import conf
     import file_handler as fh
 
@@ -473,17 +504,24 @@ if __name__ == '__main__':
 
     warnings.filterwarnings("ignore")
 
-    file_path = fh.load_file_npy()
+    file_path = fh.get_file_paths()
 
-    img_ori = np.load(file_path[0])
-    img = img_ori[:, :, tslice, zslice]
+    #mask = np.load(conf.dir_data_mask + "cinedata_1_mask.npy")
 
-    print(img.shape)
 
-    position = [(250,250), (180,180), (200, 200)]
+    for i in range(len(file_path)):
+        token = file_path[i].split('/')
+        file_name = token[-1].split('.')[0]
+        file_name = file_name + "_mask"
 
-    mask = img2mask(img, mask = None)
+        full_path = os.path.join(conf.dir_data_mask, file_name)
 
+        img_ori = np.load(file_path[0])
+        img = img_ori[:, :, tslice, zslice]
+        print("==="+file_name+"===")
+        print(img.shape)
+        mask = img2mask(img)
+        np.save(full_path, mask)
     """define axis and corresponding figure it falls under:
     fig1, ax1 = plt.subplots()
     ax1.imshow(mask, cmap = plt.cm.gray)
