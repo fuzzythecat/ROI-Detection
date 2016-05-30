@@ -3,6 +3,7 @@ import copy
 
 ''' global variables '''
 
+
 def normalize(img, **kwargs):
 
     def img_rescale(ret):
@@ -14,10 +15,10 @@ def normalize(img, **kwargs):
 
         for t in range(tl):
             for z in range(zl):
-                max = numpy.amax(img[:,:,t,z])
+                max = numpy.amax(img[:, :, t, z])
                 for i in range(xl):
                     for j in range(yl):
-                        ret[i,j,t,z] /= max
+                        ret[i, j, t, z] /= max
         return ret
 
     def patch_rescale(ret):
@@ -27,10 +28,10 @@ def normalize(img, **kwargs):
         yl = img.shape[2]
 
         for i in range(idx):
-            max = numpy.amax(img[i,:,:])
+            max = numpy.amax(img[i, :, :])
             for x in range(xl):
                 for y in range(yl):
-                    ret[i,x,y] /= max
+                    ret[i, x, y] /= max
         return ret
 
     flag = kwargs.pop("flag", None)
@@ -52,10 +53,10 @@ if __name__ == "__main__":
     print(img_ori.shape)
 
     '''resized img to 256*256'''
-    img_256 = resize(img_ori, mode = 256)
-    print (img_256.shape)
+    img_256 = resize(img_ori, mode=256)
+    print(img_256.shape)
 
-    img_normalized_256 = normalize(img_256, flag = "img")
+    img_normalized_256 = normalize(img_256, flag="img")
     print(img_normalized_256.shape)
     print(img_normalized_256)
 

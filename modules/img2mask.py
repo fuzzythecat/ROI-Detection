@@ -522,7 +522,7 @@ if __name__ == '__main__':
 
     warnings.filterwarnings("ignore")
 
-    file_path = fh.get_file_paths()
+    file_path = fh.get_file_paths(path=conf.dir_data_cine)
 
     mask = np.load(conf.dir_data_mask + "cinedata_1_mask.npy")
 
@@ -536,8 +536,11 @@ if __name__ == '__main__':
 
         img_ori = np.load(file_path[0])
         img = img_ori[:, :, tslice, zslice]
-        print("==="+file_name+"===")
-        print(img.shape)
-        mask = img2mask(img, mask=mask)
-        np.save(full_path, mask)
+        #print("==="+file_name+"===")
+        #print(img.shape)
+        mask = img2mask(img)
+        #np.save(full_path, mask)
+
+        filename = fh.save_file_dialog(path=conf.dir_data_mask)
+        np.save(filename, mask)
 
