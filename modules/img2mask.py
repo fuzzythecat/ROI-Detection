@@ -12,6 +12,7 @@ from matplotlib.patches import Polygon
 from matplotlib.lines import Line2D
 from matplotlib.mlab import dist_point_to_segment
 from copy import deepcopy
+from time import sleep
 
 import warnings
 
@@ -26,30 +27,27 @@ class ClickerClass(object):
                     "Press 'm' to switch modes",
              False: "'i': insert, 't': toggle vertex, 'RIGHT': delete\n"
                      "Press 'Enter' to crop, 'm' to switch modes"}
+    title2 = "Press 'Enter' to crop and close figures\n" + \
+             "Press 'c' to recalibrate landmarks"
+
     alpha = 0.30
 
     number_of_verticies_for_calib = 20
-    subplotnum = 0
-
 
     def __init__(self, img, **kwargs):
 
         self.ax1 = kwargs.pop('ax1', None)
-        self.ax2 = kwargs.pop('ax2', None)
-
-        if self.ax1 is not None:
-            self.fig1 = self.ax1.get_figure()
-            self.canvas1 = self.fig1.canvas
-        if self.ax2 is not None:
-            self.fig2 = self.ax2.get_figure()
-            self.canvas2 = self.fig2.canvas
-        else:
-            self.fig2 = None
-            self.canvas2 = None
 
         self.img = img
         self.mask = kwargs.pop('mask', None)
         self.verts = kwargs.pop('position', [])
+
+        self.fig2, self.ax2, self.canvas2 = None, None, None
+        self.fig1 = self.ax1.get_figure()
+        self.canvas1 = self.fig1.canvas
+
+        if self.mask is not None:
+            self.create_mask_fig()
 
         self.line = None
         self.poly = None
@@ -92,7 +90,7 @@ class ClickerClass(object):
     def mask_init(self):
         self.auto_calibration()
         self.poly_init()
-        self.update_msk()
+        self.update_mask()
 
     def plot_init(self):
         self.ax1.set_title(self.title[True])
@@ -227,10 +225,22 @@ class ClickerClass(object):
             self.insert_vertex(event)
         elif event.key == 'enter':
             self.poly2mask()
-        elif event.key == 'c':
-            self.mask_init()
 
         self.canvas1.draw()
+
+    def save_and_close(self):
+        sleep(2)
+        plt.close(self.fig2)
+        plt.close(self.fig1)
+
+    def key_press_callback2(self, event):
+        if not event.inaxes:
+            return
+        if event.key == 'enter':
+            self.save_and_close()
+        elif event.key == 'c':
+            self.mask_init()
+            self.canvas1.draw()
 
     def poly2mask(self):
         if self.modes: return
@@ -250,30 +260,37 @@ class ClickerClass(object):
         else:
             self.create_mask_fig()
 
-        '''
-        fig2, ax2 = plt.subplots()
-        ax2.imshow(self.mask, cmap = plt.cm.gray)
-
-        plt.ion()
-        plt.pause(2)
-        plt.close(fig2)
-        print ("mask updated")
-
-        plt.close(self.ax1.get_figure())
-        '''
-
     def create_mask_fig(self):
         self.fig2 = plt.figure()
         self.canvas2 = self.fig2.canvas
         self.ax2 = self.fig2.add_subplot(1, 1, 1)
         self.ax2.imshow(self.mask, cmap=plt.cm.gray)
+        self.ax2.set_title(self.title2)
+        self.ax2.set_ylabel("Accuracy: %d points" % \
+                            self.number_of_verticies_for_calib)
+        self.canvas2.mpl_connect('key_press_event', self.key_press_callback2)
+        self.canvas2.mpl_connect('close_event', self.close_callback)
+        self.canvas2.mpl_connect('scroll_event', self.scroll_callback2)
+
         self.fig2.show()
 
-        self.canvas2.mpl_connect('close_event', self.close_callback)
+    def scroll_callback2(self, event):
+        if event.button == 'up':
+            if self.number_of_verticies_for_calib < 40:
+                self.number_of_verticies_for_calib += 2
+        elif event.button == 'down':
+            self.number_of_verticies_for_calib -= 2
+            if self.number_of_verticies_for_calib < 10:
+                self.number_of_verticies_for_calib = 10
+
+        self.ax2.set_ylabel("Accuracy: %d points" % \
+                            self.number_of_verticies_for_calib)
+        self.canvas2.draw()
 
     def close_callback(self, event):
         self.fig2 = None
         self.canvas2 = None
+        self.ax2 = None
 
     def update_mask(self):
         if self.fig2 is not None:
@@ -446,7 +463,7 @@ class ClickerClass(object):
 
         return xs, ys
 
-  #temporary version
+    #temporary version
     def verts_sort(self):
         ret, arr = [], self.verts[1:]
         ret.append(self.verts[0])
@@ -479,7 +496,7 @@ def img2mask(img, **kwargs):
     """preventing plot from clearing image"""
     ax1.hold(True)
 
-    """if mask provided, prepare second figure"""
+    """if mask provided, prepare second figure
     fig2, ax2 = None, None
     if mask is not None:
         fig2, ax2 = plt.subplots()
@@ -487,8 +504,9 @@ def img2mask(img, **kwargs):
         ax2.set_ylim([mask.shape[0], 0.0])
         ax2.autoscale = False
         ax2.hold(True)
+    """
 
-    return ClickerClass(deepcopy(img), ax1=ax1, ax2=ax2, \
+    return ClickerClass(deepcopy(img), ax1=ax1, \
                         mask=mask, position=position).mask
 
 if __name__ == '__main__':
@@ -506,7 +524,7 @@ if __name__ == '__main__':
 
     file_path = fh.get_file_paths()
 
-    #mask = np.load(conf.dir_data_mask + "cinedata_1_mask.npy")
+    mask = np.load(conf.dir_data_mask + "cinedata_1_mask.npy")
 
 
     for i in range(len(file_path)):
@@ -520,19 +538,6 @@ if __name__ == '__main__':
         img = img_ori[:, :, tslice, zslice]
         print("==="+file_name+"===")
         print(img.shape)
-        mask = img2mask(img)
+        mask = img2mask(img, mask=mask)
         np.save(full_path, mask)
-    """define axis and corresponding figure it falls under:
-    fig1, ax1 = plt.subplots()
-    ax1.imshow(mask, cmap = plt.cm.gray)
 
-    ax1.set_xlim([0.0, mask.shape[1]])
-    ax1.set_ylim([mask.shape[0], 0.0])
-    ax1.autoscale = False
-
-    ax1.hold(True)
-    plt.show()
-    """
-
-
-    print("mask complete")
