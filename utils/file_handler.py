@@ -33,6 +33,7 @@ def get_file_path(**kwargs):
 
     return filename
 
+
 def get_file_paths(**kwargs):
     """
     Wrapper function for tkinter.filedialog askopenfilenames. Retreives
@@ -67,6 +68,7 @@ def get_file_paths(**kwargs):
     filename = askopenfilenames(**options)
 
     return filename
+
 
 def save_file_dialog(**kwargs):
     """
@@ -103,6 +105,7 @@ def save_file_dialog(**kwargs):
 
     return filename
 
+
 def retreive_filename(path):
     """
     Truncates absolute file directory and returns file name.
@@ -125,5 +128,3 @@ def retreive_filename(path):
 if __name__ == "__main__":
 
     retreive_filename("/dir/filenameishere.npy")
-
-

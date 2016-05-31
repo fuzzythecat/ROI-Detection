@@ -1,6 +1,7 @@
 import random
 import numpy
 
+
 def crop(img, **kwargs):
     """
     From 64*64 images of 30 time frames and z-slice-no's [2:9] (default),
@@ -46,9 +47,7 @@ def crop(img, **kwargs):
 
                 for x in range(lim):
                     for y in range(lim):
-                        patch[idx,x,y] = img[x+xdisp,y+ydisp,t,z]
+                        patch[idx, x, y] = img[x+xdisp, y+ydisp, t, z]
                 idx += 1
 
     return patch
-
-
