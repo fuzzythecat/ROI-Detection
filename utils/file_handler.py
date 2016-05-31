@@ -1,46 +1,129 @@
 def get_file_path(**kwargs):
+    """
+    Wrapper function for tkinter.filedialog askopenfilename. Retreives
+    name and directory of file to be opened.
+
+    Parameters
+    ----------
+    (optional)
+    initialdir : Initial directory displayed in file dialog.
+    Defaults to /data directory.
+
+    filetypes : Sequence of (label, pattern) tuples. Use '*' as the pattern
+    to indicate all files. Defaults to ('numpy files', '.npy').
+
+    Returns
+    -------
+    filename : 1-dimensional string of
+    absolute directory + name of the selected file.
+    """
+
     from tkinter import Tk
-    from tkinter.filedialog import askopenfilename as open_file
+    from tkinter.filedialog import askopenfilename
     import conf
 
-    path = kwargs.pop("path", conf.dir_data_cine)
+    options = {}
+    options["initialdir"] = kwargs.pop("initialdir", conf.dir_data)
+    options["filetypes"] = kwargs.pop("filetypes", ('numpy files', '.npy'))
 
     root = Tk()
     root.withdraw()
-    file_path = open_file(filetypes=[('numpy array', '.npy')], \
-                          initialdir=path)
 
-    return file_path
+    filename = askopenfilename(**options)
+
+    return filename
 
 def get_file_paths(**kwargs):
+    """
+    Wrapper function for tkinter.filedialog askopenfilenames. Retreives
+    names and directories of files to be opened.
+
+    Parameters
+    ----------
+    (optional)
+    initialdir : Initial directory displayed in file dialog.
+    Defaults to /data directory.
+
+    filetypes : Sequence of (label, pattern) tuples. Use '*' as the pattern
+    to indicate all files. Defaults to ('numpy files', '.npy').
+
+    Returns
+    -------
+    filename : 2-dimensional string of
+    absolute directory + name of the selected file.
+    """
+
     from tkinter import Tk
-    from tkinter.filedialog import askopenfilenames as open_files
+    from tkinter.filedialog import askopenfilenames
     import conf
 
-    path = kwargs.pop("path", conf.dir_data_cine)
+    options = {}
+    options["initialdir"] = kwargs.pop("initialdir", conf.dir_data)
+    options["filetypes"] = kwargs.pop("filetypes", [("numpy files", ".npy")])
 
     root = Tk()
     root.withdraw()
-    file_path = open_files(filetypes=[('numpy array', '.npy')], \
-                           initialdir=path)
 
-    return file_path
+    filename = askopenfilenames(**options)
+
+    return filename
 
 def save_file_dialog(**kwargs):
+    """
+    Wrapper function for tkinter.filedialog asksaveasfilename. Retreives
+    name and directory of file to be saved.
+
+    Parameters
+    ----------
+    (optional)
+    initialdir : Initial directory displayed in file dialog.
+    Defaults to /data directory.
+
+    defaultextension : Extension of the file to be saved.
+    Defaults to '.npy'
+
+    Returns
+    -------
+    filename : 1-dimensional string of
+    absolute directory + name of the file to be saved.
+    """
+
     import conf
-    from tkinter.filedialog import asksaveasfilename as save_file
+    from tkinter.filedialog import asksaveasfilename
 
-    path = kwargs.pop("path", conf.dir_data_mask)
+    options = {}
+    options["initialdir"] = kwargs.pop("initialdir", conf.dir_data)
+    options["defaultextension"] = kwargs.pop("defaultextension", ".npy")
 
-    filename = save_file(defaultextension=".npy", initialdir=path)
+    filename = asksaveasfilename(**options)
+
+    # asksaveasfilename returns 'None' if dialog closed with 'cancel'
     if filename is None:
-        """save_file returns 'None' if dialog closed with 'cancel'"""
         return
+
+    return filename
+
+def retreive_filename(path):
+    """
+    Truncates absolute file directory and returns file name.
+
+    Parameters
+    ----------
+    path : 1-dimensional string containing absolute directory of a file,
+    in /<dir>/<filename>.<foramt> format.
+
+    Returns
+    -------
+    filename : <filename> portion of the given file directory.
+    """
+
+    token = path.split('/')
+    filename = token[-1].split('.')[0]
 
     return filename
 
 if __name__ == "__main__":
 
-    save_file_dialog()
+    retreive_filename("/dir/filenameishere.npy")
 
 
