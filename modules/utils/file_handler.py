@@ -1,3 +1,6 @@
+import sys
+sys.path.append("../utils/")
+
 def get_file_path(**kwargs):
     """
     Wrapper function for tkinter.filedialog askopenfilename. Retreives
@@ -20,16 +23,19 @@ def get_file_path(**kwargs):
 
     from tkinter import Tk
     from tkinter.filedialog import askopenfilename
-    import conf
+    from utils import conf
 
     options = {}
     options["initialdir"] = kwargs.pop("initialdir", conf.dir_data)
-    options["filetypes"] = kwargs.pop("filetypes", ('numpy files', '.npy'))
+    options["filetypes"] = kwargs.pop("filetypes", [("numpy files", ".npy")])
+    options["title"] = kwargs.pop("title", "loadsdfsdfsdfge")
 
     root = Tk()
     root.withdraw()
 
     filename = askopenfilename(**options)
+    if filename is None:
+        return None
 
     return filename
 
@@ -56,16 +62,20 @@ def get_file_paths(**kwargs):
 
     from tkinter import Tk
     from tkinter.filedialog import askopenfilenames
-    import conf
+    from utils import conf
 
     options = {}
     options["initialdir"] = kwargs.pop("initialdir", conf.dir_data)
     options["filetypes"] = kwargs.pop("filetypes", [("numpy files", ".npy")])
+    options["title"] = kwargs.pop("title", "sdfsdfsdfsdfsdfsdf")
+
 
     root = Tk()
     root.withdraw()
 
     filename = askopenfilenames(**options)
+    if filename is None:
+        return None
 
     return filename
 
@@ -90,18 +100,19 @@ def save_file_dialog(**kwargs):
     absolute directory + name of the file to be saved.
     """
 
-    import conf
+    from utils import conf
     from tkinter.filedialog import asksaveasfilename
 
     options = {}
     options["initialdir"] = kwargs.pop("initialdir", conf.dir_data)
     options["defaultextension"] = kwargs.pop("defaultextension", ".npy")
+    options["title"] = kwargs.pop("title", "save mask")
 
     filename = asksaveasfilename(**options)
 
     # asksaveasfilename returns 'None' if dialog closed with 'cancel'
     if filename is None:
-        return
+        return None
 
     return filename
 

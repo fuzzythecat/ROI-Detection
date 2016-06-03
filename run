@@ -1,0 +1,9 @@
+cd routines
+python seed.py
+
+cd ../modules/itk
+python mask.py
+
+cd ../../routines
+python convexhull.py
+python show.py

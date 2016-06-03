@@ -3,6 +3,7 @@ __pycache__/
 data/
 cine/
 docs/
+itk/
 *.py[cod]
 *$py.class
 
