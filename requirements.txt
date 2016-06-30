@@ -4,3 +4,4 @@ numpy
 pillow
 flake8
 pyqt5
+scikit-image

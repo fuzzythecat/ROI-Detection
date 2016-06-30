@@ -1,9 +1,18 @@
+>/dev/null
+
 cd routines
-python seed.py
+python endocardial_seed.py
 
 cd ../modules/itk
-python mask.py
+python endocardial_mask.py
 
 cd ../../routines
-python convexhull.py
+python endocardial_hull.py
+
+cd ../modules/itk
+python epicardial_mask.py
+
+cd ../../routines
+python epicardial_hull.py
+
 python show.py

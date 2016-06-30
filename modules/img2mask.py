@@ -42,7 +42,9 @@ class ClickerClass(object):
 
         self.img = img
         self.mask = kwargs.pop('mask', None)
-        self.verts = kwargs.pop('position', None)
+        self.verts = kwargs.pop('position', [])
+        if self.verts is None:
+            self.verts = []
 
         self.fig2, self.ax2, self.canvas2 = None, None, None
         self.fig1 = self.ax1.get_figure()
@@ -66,10 +68,6 @@ class ClickerClass(object):
         plt.show()
 
     def set_modes(self):
-        if self.img is None:
-            raise AttributeError("User must provide <numpy.ndarray> image")
-        if self.verts is None:
-            self.verts = []
 
         """if position provided"""
         if len(self.verts) > 0:
@@ -105,6 +103,7 @@ class ClickerClass(object):
         self.ax1.set_ylabel("Alpha: %.2f" % self.alpha)
 
         if self.poly is None:
+            print(self.verts)
             self.create_polygon()
         else:
             self.poly.xy = np.array(self.verts[:])
@@ -501,6 +500,55 @@ def img2mask(img, **kwargs):
     return ClickerClass(deepcopy(img), ax1=ax1, \
                         mask=mask, position=position).mask
 
+
+class SeedClickerClass(object):
+
+    _title = "LEFT: select seed point\n" + \
+             "Press 'enter' to save and close"
+
+    def __init__(self, img, **kwargs):
+
+        self.img = img
+        self.verts = []
+        self.ax1 = kwargs.pop('ax1')
+        self.ax1.set_title(self._title)
+
+        self.fig1 = self.ax1.get_figure()
+        self.canvas1 = self.fig1.canvas
+
+        self.plot = self.ax1.plot([], [], marker='o', markerfacecolor='b',
+                              linestyle='none', markersize = 5)[0]
+
+        self.connect_activity()
+        plt.show()
+
+    def button_press_callback(self, event):
+        if not event.inaxes: return
+
+        #Left click to renew vertex
+        if event.button == 1:
+            self.verts = [(event.xdata, event.ydata)]
+
+            # print(event.xdata, event.ydata)
+            # Re-plot the landmarks on canvas
+            x, y = zip(*self.verts)
+            self.plot.set_xdata(x)
+            self.plot.set_ydata(y)
+
+            self.canvas1.draw()
+
+    def key_press_callback(self, event):
+        if not event.inaxes: return
+
+        if event.key == 'enter':
+            sleep(1)
+            plt.close(self.fig1)
+
+    def connect_activity(self):
+        self.canvas1.mpl_connect('button_press_event', self.button_press_callback)
+        self.canvas1.mpl_connect('key_press_event', self.key_press_callback)
+
+
 def select_seed(img, **kwargs):
 
     """define axis and corresponding figure img falls under"""
@@ -514,7 +562,10 @@ def select_seed(img, **kwargs):
     """preventing plot from clearing image"""
     ax1.hold(True)
 
-    return ClickerClass(deepcopy(img), ax1=ax1).verts
+    verts = SeedClickerClass(deepcopy(img), ax1=ax1).verts
+
+    return verts
+
 
 
 if __name__ == '__main__':
