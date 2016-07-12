@@ -1,8 +1,10 @@
-import dicom
 from matplotlib import use
 use("Qt4Agg")
-import matplotlib.pyplot as plt
 import numpy as np
+import sys
+
+from PyQt4.QtGui import *
+
 
 import modules.io as io
 import modules.algorithm as alg
@@ -22,9 +24,10 @@ data = np.load(fname)
 data = alg.resize(data, mode=256)
 print(data.shape)
 
-fig = gui.MainFrame(data)
-
+app = QApplication(sys.argv)
+fig = gui.MainFrame()
 fig.show()
+app.exec_()
 
 '''
 fig1 = plt.figure()
