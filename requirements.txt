@@ -1,7 +1,6 @@
 matplotlib
 scipy
-numpy
 pillow
 flake8
-pyqt5
+pydicom
 scikit-image

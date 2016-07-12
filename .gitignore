@@ -6,9 +6,14 @@ docs/
 itk/
 *.py[cod]
 *$py.class
+.npy
 
 #test code repo
 test/
+tests/
+test*
+
+temp/
 
 # C extensions
 *.so

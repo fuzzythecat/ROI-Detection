@@ -1,5 +1,4 @@
-import sys
-sys.path.append("../utils/")
+from modules import conf
 
 def get_file_path(**kwargs):
     """
@@ -23,17 +22,11 @@ def get_file_path(**kwargs):
 
     from tkinter import Tk
     from tkinter.filedialog import askopenfilename
-    from utils import conf
-
-    options = {}
-    options["initialdir"] = kwargs.pop("initialdir", conf.dir_data)
-    options["filetypes"] = kwargs.pop("filetypes", [("numpy files", ".npy")])
-    options["title"] = kwargs.pop("title", "loadsdfsdfsdfge")
 
     root = Tk()
     root.withdraw()
 
-    filename = askopenfilename(**options)
+    filename = askopenfilename(**conf.load_options)
     if filename is None:
         return None
 
@@ -62,18 +55,11 @@ def get_file_paths(**kwargs):
 
     from tkinter import Tk
     from tkinter.filedialog import askopenfilenames
-    from utils import conf
-
-    options = {}
-    options["initialdir"] = kwargs.pop("initialdir", conf.dir_data)
-    options["filetypes"] = kwargs.pop("filetypes", [("numpy files", ".npy")])
-    options["title"] = kwargs.pop("title", "sdfsdfsdfsdfsdfsdf")
-
 
     root = Tk()
     root.withdraw()
 
-    filename = askopenfilenames(**options)
+    filename = askopenfilenames(**conf.load_options)
     if filename is None:
         return None
 
@@ -100,15 +86,9 @@ def save_file_dialog(**kwargs):
     absolute directory + name of the file to be saved.
     """
 
-    from utils import conf
     from tkinter.filedialog import asksaveasfilename
 
-    options = {}
-    options["initialdir"] = kwargs.pop("initialdir", conf.dir_data)
-    options["defaultextension"] = kwargs.pop("defaultextension", ".npy")
-    options["title"] = kwargs.pop("title", "save mask")
-
-    filename = asksaveasfilename(**options)
+    filename = asksaveasfilename(**conf.save_options)
 
     # asksaveasfilename returns 'None' if dialog closed with 'cancel'
     if filename is None:
@@ -137,5 +117,4 @@ def retreive_filename(path):
     return filename
 
 if __name__ == "__main__":
-
-    retreive_filename("/dir/filenameishere.npy")
+    pass
