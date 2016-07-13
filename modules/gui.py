@@ -65,6 +65,8 @@ class MainFrame(QtGui.QWidget):
         self.slider_t.setTickPosition(QtGui.QSlider.TicksBothSides)
         self.slider_t.setTickInterval(5)
         self.slider_t.setSingleStep(1)
+        self.slider_t.setTracking(True)
+        self.slider_t.setRange(0, 29)
         self.grid.addWidget(self.slider_t, 7, 2, 1, 2)
 
         self.slider_z = QtGui.QSlider(QtCore.Qt.Horizontal)
@@ -72,6 +74,8 @@ class MainFrame(QtGui.QWidget):
         self.slider_z.setTickPosition(QtGui.QSlider.TicksBothSides)
         self.slider_z.setTickInterval(5)
         self.slider_z.setSingleStep(1)
+        self.slider_z.setTracking(True)
+        self.slider_z.setRange(0, 14)
         self.grid.addWidget(self.slider_z, 8, 2, 1, 2)
 
         self.spinbox_t = QtGui.QSpinBox()
@@ -84,17 +88,32 @@ class MainFrame(QtGui.QWidget):
         self.spinbox_z.setSingleStep(1)
         self.grid.addWidget(self.spinbox_z, 8, 1)
 
+        self.spinbox_t.valueChanged.connect(self.slider_t.setValue)
+        self.slider_t.valueChanged.connect(self.spinbox_t.setValue)
+        self.slider_t.valueChanged.connect(self.update_t)
+
+        self.spinbox_z.valueChanged.connect(self.slider_z.setValue)
+        self.slider_z.valueChanged.connect(self.spinbox_z.setValue)
+        self.slider_z.valueChanged.connect(self.update_z)
+
         self.title3 = QtGui.QLabel("Time slice [0, 30): ")
         self.title3.setStyleSheet("font: bold")
         self.title3.setAlignment(QtCore.Qt.AlignCenter)
         self.grid.addWidget(self.title3, 7, 0)
 
-        self.title4 = QtGui.QLabel("Z slice [0, 30): ")
+        self.title4 = QtGui.QLabel("Z slice [0, 15): ")
         self.title4.setStyleSheet("font: bold")
         self.title4.setAlignment(QtCore.Qt.AlignCenter)
         self.grid.addWidget(self.title4, 8, 0)
 
         self.setLayout(self.grid)
+
+
+    def update_t(self, value):
+        print("t value set at: ", value)
+
+    def update_z(self, value):
+        print("z value set at: ", value)
 
     def load_img(self):
         print("load_img")
