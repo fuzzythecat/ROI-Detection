@@ -2,8 +2,8 @@ from modules import conf
 
 def get_file_path(**kwargs):
     """
-    Wrapper function for tkinter.filedialog askopenfilename. Retreives
-    name and directory of file to be opened.
+    Wrapper function for PyQt4.QtGui.QFileDialog.getOpenFileName().
+    Retreives name and directory of file to be opened.
 
     Parameters
     ----------
@@ -19,24 +19,17 @@ def get_file_path(**kwargs):
     filename : 1-dimensional string of
     absolute directory + name of the selected file.
     """
+    from PyQt4 import QtGui
 
-    from tkinter import Tk
-    from tkinter.filedialog import askopenfilename
-
-    root = Tk()
-    root.withdraw()
-
-    filename = askopenfilename(**conf.load_options)
-    if filename is None:
-        return None
+    filename = QtGui.QFileDialog.getOpenFileName()
 
     return filename
 
 
 def get_file_paths(**kwargs):
     """
-    Wrapper function for tkinter.filedialog askopenfilenames. Retreives
-    names and directories of files to be opened.
+    Wrapper function for PyQt4.QtGui.QFileDialog.getOpenFileNames().
+    Retreives name and directory of file to be opened.
 
     Parameters
     ----------
@@ -53,23 +46,17 @@ def get_file_paths(**kwargs):
     absolute directory + name of the selected file.
     """
 
-    from tkinter import Tk
-    from tkinter.filedialog import askopenfilenames
+    from PyQt4 import QtGui
 
-    root = Tk()
-    root.withdraw()
-
-    filename = askopenfilenames(**conf.load_options)
-    if filename is None:
-        return None
+    filename = QtGui.QFileDialog.getOpenFileNames()
 
     return filename
 
 
 def save_file_dialog(**kwargs):
     """
-    Wrapper function for tkinter.filedialog asksaveasfilename. Retreives
-    name and directory of file to be saved.
+    Wrapper function for PyQt4.QtGui.QFileDialog.getSaveFileName()
+    Retreives name and directory of file to be saved.
 
     Parameters
     ----------
@@ -86,13 +73,9 @@ def save_file_dialog(**kwargs):
     absolute directory + name of the file to be saved.
     """
 
-    from tkinter.filedialog import asksaveasfilename
+    from PyQt4 import QtGui
 
-    filename = asksaveasfilename(**conf.save_options)
-
-    # asksaveasfilename returns 'None' if dialog closed with 'cancel'
-    if filename is None:
-        return None
+    filename = QtGui.QFileDialog.getSaveFileName()
 
     return filename
 
