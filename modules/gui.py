@@ -13,6 +13,14 @@ from modules import io
 
 class MainFrame(QtGui.QWidget):
 
+    _tidx = 0
+    _zidx = 0
+    _loadflag = False
+
+    _img = None
+    _mask = None
+    _slice = None
+
     valueChanged = QtCore.pyqtSignal(int)
 
     def __init__(self, master=None):
@@ -48,10 +56,13 @@ class MainFrame(QtGui.QWidget):
         self.btn6 = QtGui.QPushButton("Current")
         self.btn6.clicked.connect(self.singular_epicardial_detection)
 
-        self.fig = Figure(figsize=(10, 10), dpi=100)
-        self.ax1 = self.fig.add_subplot(121)
-        self.ax2 = self.fig.add_subplot(122)
-        self.canvas = FigureCanvas(self.fig)
+        self.fig1 = Figure(figsize=(5, 5), dpi=100)
+        self.ax1 = self.fig1.add_subplot(111)
+        self.canvas1 = FigureCanvas(self.fig1)
+
+        self.fig2 = Figure(figsize=(5, 5), dpi=100)
+        self.ax2 = self.fig2.add_subplot(111)
+        self.canvas2 = FigureCanvas(self.fig2)
 
         self.slider_t = QtGui.QSlider(QtCore.Qt.Horizontal)
         self.slider_t.setFocusPolicy(QtCore.Qt.StrongFocus)
@@ -101,7 +112,8 @@ class MainFrame(QtGui.QWidget):
         self.grid.addWidget(self.btn4, 0, 3)
         self.grid.addWidget(self.btn5, 1, 2)
         self.grid.addWidget(self.btn6, 1, 3)
-        self.grid.addWidget(self.canvas, 2, 0, 5, 4)
+        self.grid.addWidget(self.canvas1, 2, 0, 5, 2)
+        self.grid.addWidget(self.canvas2, 2, 2, 5, 2)
         self.grid.addWidget(self.slider_t, 7, 2, 1, 2)
         self.grid.addWidget(self.slider_z, 8, 2, 1, 2)
         self.grid.addWidget(self.spinbox_t, 7, 1)
@@ -111,30 +123,84 @@ class MainFrame(QtGui.QWidget):
 
         self.setLayout(self.grid)
 
+    def initialize(self):
+        self._loadflag = False
+
+        self.slider_t.setValue(0)
+        self.slider_z.setValue(0)
+
+        self.spinbox_t.setValue(0)
+        self.spinbox_t.setValue(0)
+
+        self._tidx, self._zidx = 0, 0
+
+        self._img, self._mask, self._slice = None, None, None
 
     def update_t(self, value):
-        print("t value set at: ", value)
+        if self._loadflag == True:
+            self._tidx = value
+            #self._slice = self._img[:, :, self._tidx, self._zidx]
+
+            self.redraw_img()
+
 
     def update_z(self, value):
-        print("z value set at: ", value)
+        if self._loadflag == True:
+            self._zidx = value
+            #self._slice = self._img[:, :, self._tidx, self._zidx]
+
+            self.redraw_img()
 
     def load_img(self):
         fname = io.get_file_path()
-        print(fname)
+        if len(fname) == 0:
+            return
 
+        print("loading [{}]...".format(fname))
+
+        self.initialize()
+        self._loadflag = True
+        self._img = np.load(fname)
+        self._slice = self._img[:, :, self._tidx, self._zidx]
+        self._mask = np.zeros(self._slice.shape)
+
+        self.redraw()
+
+    def redraw_img(self):
+        self.ax1.imshow(self._img[:, :, self._tidx, self._zidx],
+                        cmap=plt.cm.gray)
+        self.canvas1.draw()
+
+
+    def redraw_mask(self):
+        self.ax2.imshow(self._mask, cmap=plt.cm.gray)
+        self.canvas2.draw()
+
+
+    def redraw(self):
+        self.ax1.imshow(self._img[:, :, self._tidx, self._zidx],
+                        cmap=plt.cm.gray)
+        self.ax2.imshow(self._mask, cmap=plt.cm.gray)
+
+        self.canvas1.draw()
+        self.canvas2.draw()
 
     def save_img(self):
         fname = io.save_file_dialog()
         print(fname)
 
+
     def singular_endocardial_detection(self):
         print("sin_end")
+
 
     def complete_endocardial_detection(self):
         print("com_end")
 
+
     def singular_epicardial_detection(self):
         print("sin_epi")
+
 
     def complete_epicardial_detection(self):
         print("com_epi")

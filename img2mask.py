@@ -19,10 +19,10 @@ dat = ds.pixel_array
 
 #fname = io.get_file_path()
 
-fname = "/Users/Ellsbury/Desktop/cinedata_1.npy"
-data = np.load(fname)
-data = alg.resize(data, mode=256)
-print(data.shape)
+#fname = "/Users/Ellsbury/Desktop/cinedata_1.npy"
+#data = np.load(fname)
+#data = alg.resize(data, mode=256)
+#print(data.shape)
 
 app = QApplication(sys.argv)
 fig = gui.MainFrame()
