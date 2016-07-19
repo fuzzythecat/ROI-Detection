@@ -3,6 +3,18 @@ import sys
 from modules import conf
 
 def load_cine_from_directory(cinedir):
+    """
+    Integrates 2-dimensional dicom slices from cine directory
+    into 4-dimensional numpy array.
+
+    Parameters
+    ----------
+    cinedir : Working directory where the slices are located.
+
+    Returns
+    -------
+    cine_img : 4-dimensional integrated numpy array.
+    """
     import dicom
     import numpy as np
 
@@ -22,11 +34,9 @@ def load_cine_from_directory(cinedir):
     print("loading cine data", end="")
 
     for i in range(0, zslice):
-        # print("cine series: %s" % cine_series[i])
         cwdir = cinedir + cine_series[i]
         os.chdir(cwdir)
         session_files = os.listdir()
-        # print(session_files)
 
         if(i % (zslice/5) == 0):
             print(".", end="", flush=True)
@@ -35,7 +45,6 @@ def load_cine_from_directory(cinedir):
         for f in session_files:
             if("DS" in f): continue
             ds = dicom.read_file(f)
-            # print(ds.PatientName+ds.Rows+ds.Columns)
             if zcount == 0 and tcount == 0:
                 pixelDims = (int(ds.Rows),
                         int(ds.Columns), int(30), int(zslice))
@@ -54,21 +63,15 @@ def load_cine_from_directory(cinedir):
 def get_directory(**kwargs):
     """
     Wrapper function for PyQt4.QtGui.QFileDialog.getExistingDirectory().
-    Retreives name and directory of file to be opened.
+    Returns the absolute directory of the chosen directory.
 
     Parameters
     ----------
-    (optional)
-    initialdir : Initial directory displayed in file dialog.
-    Defaults to /data directory.
-
-    filetypes : Sequence of (label, pattern) tuples. Use '*' as the pattern
-    to indicate all files. Defaults to ('numpy files', '.npy').
+    None
 
     Returns
     -------
-    filename : 1-dimensional string of
-    absolute directory + name of the selected file.
+    filename : string of absolute directory.
     """
     from PyQt4 import QtGui
 
