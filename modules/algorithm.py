@@ -46,29 +46,7 @@ def resize(img, **kwargs):
 
     elif mode == 256:
         ret = zeros((256, 256, tl, zl))
-        """
-        for t in range(tl):
-            if(t % (tl/5) == 0):
-                print(".", end="", flush=True)
 
-            for z in range(zl):
-                if(xl > 256):
-                    for x in range(256):
-                        if(yl > 256):
-                            for y in range(256):
-                                ret[x, y, t, z] = img[x, y, t, z]
-                        else:
-                            for y in range(yl):
-                                ret[x, y, t, z] = img[x, y, t, z]
-                else:
-                    for x in range(xl):
-                        if(yl > 256):
-                            for y in range(256):
-                                ret[x, y, t, z] = img[x, y, t, z]
-                        else:
-                            for y in range(yl):
-                                ret[x, y, t, z] = img[x, y, t, z]
-        """
         if(xl >= 256 and yl >= 256):
             ret[:, :, :, :] = img[xl-256:, yl-256:, :, :]
         elif (xl >= 256 and yl <= 256):
@@ -77,6 +55,8 @@ def resize(img, **kwargs):
             ret[256-xl:, :, :, :] = img[:, yl-256:, :, :]
         elif(xl <= 256 and yl <= 256):
             ret[256-xl:, 256-yl:, :, :] = img[:, :, :, :]
+
+    print("resized dimension: ", ret.shape)
 
     return ret
 
