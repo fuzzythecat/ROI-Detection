@@ -24,8 +24,12 @@ def resize(img, **kwargs):
 
     mode = kwargs.pop("mode", 64)
 
+    xl = img.shape[0]
+    yl = img.shape[1]
     tl = img.shape[2]
     zl = img.shape[3]
+
+    print("resizing cine data.....")
 
     if mode == 64:
         temp = zeros((256, 256, tl, zl))
@@ -33,13 +37,46 @@ def resize(img, **kwargs):
 
         ret = zeros((64, 64, tl, zl))
         for t in range(tl):
+            if(t % (tl/5) == 0):
+                print(".", end="", flush=True)
+
             for z in range(zl):
                 ret[:, :, t, z] = imresize(
                         temp[:, :, t, z], (64, 64), interp='nearest')
 
     elif mode == 256:
         ret = zeros((256, 256, tl, zl))
-        ret[:, :232, :, :] = img[16:, :232, :, :zl]
+        """
+        for t in range(tl):
+            if(t % (tl/5) == 0):
+                print(".", end="", flush=True)
+
+            for z in range(zl):
+                if(xl > 256):
+                    for x in range(256):
+                        if(yl > 256):
+                            for y in range(256):
+                                ret[x, y, t, z] = img[x, y, t, z]
+                        else:
+                            for y in range(yl):
+                                ret[x, y, t, z] = img[x, y, t, z]
+                else:
+                    for x in range(xl):
+                        if(yl > 256):
+                            for y in range(256):
+                                ret[x, y, t, z] = img[x, y, t, z]
+                        else:
+                            for y in range(yl):
+                                ret[x, y, t, z] = img[x, y, t, z]
+        """
+        if(xl >= 256 and yl >= 256):
+            ret[:, :, :, :] = img[xl-256:, yl-256:, :, :]
+        elif (xl >= 256 and yl <= 256):
+            ret[:, 256-yl:, :, :] = img[xl-256:, :, :, :]
+        elif(xl <= 256 and yl >= 256):
+            ret[256-xl:, :, :, :] = img[:, yl-256:, :, :]
+        elif(xl <= 256 and yl <= 256):
+            ret[256-xl:, 256-yl:, :, :] = img[:, :, :, :]
 
     return ret
 
