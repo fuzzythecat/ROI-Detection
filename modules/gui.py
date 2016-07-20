@@ -291,6 +291,27 @@ class MainFrame(QtGui.QWidget):
         self.spinbox["tmax"].setValue(self._tmax)
         self.spinbox["zmax"].setValue(self._zmax)
 
+        # update slider titles to fit current slicenums
+        self.grid.removeWidget(self.title["tslice"])
+        self.grid.removeWidget(self.title["zslice"])
+        self.title["tslice"].deleteLater()
+        self.title["zslice"].deleteLater()
+        del self.title["tslice"]
+        del self.title["zslice"]
+
+        # set new titles
+        self.title["tslice"] = QtGui.QLabel("Time slice [0, {}): ".format(self._tslicenum))
+        self.title["tslice"].setStyleSheet("font: bold")
+        self.title["tslice"].setAlignment(QtCore.Qt.AlignCenter)
+
+        self.title["zslice"] = QtGui.QLabel("Z slice [0, {}): ".format(self._zslicenum))
+        self.title["zslice"].setStyleSheet("font: bold")
+        self.title["zslice"].setAlignment(QtCore.Qt.AlignCenter)
+
+        # add title widgets
+        self.grid.addWidget(self.title["tslice"], 7, 0)
+        self.grid.addWidget(self.title["zslice"], 8, 0)
+
 
     def update_tidx(self, value):
         if self._loadflag == True:
