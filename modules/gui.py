@@ -8,12 +8,18 @@ use("Qt4Agg")
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.patches import Polygon
+from matplotlib.lines import Line2D
+from matplotlib.mlab import dist_point_to_segment
 
 from PyQt4 import QtCore
 from PyQt4 import QtGui
 
 from modules import io
 from modules import algorithm
+
+
+from pprint import pprint
 
 class MainFrame(QtGui.QWidget):
 
@@ -39,6 +45,9 @@ class MainFrame(QtGui.QWidget):
     slider = {}
     title = {}
 
+    # ClickerClass connected with axis
+    cc = None
+
     valueChanged = QtCore.pyqtSignal(int)
 
     def __init__(self, master=None):
@@ -47,13 +56,16 @@ class MainFrame(QtGui.QWidget):
 
         self.grid = QtGui.QGridLayout()
 
-        self.fig1 = Figure(figsize=(5, 5), dpi=100)
+        self.fig1 = Figure(figsize=(6, 6), dpi=65)
         self.ax1 = self.fig1.add_subplot(111)
         self.canvas1 = FigureCanvas(self.fig1)
 
-        self.fig2 = Figure(figsize=(5, 5), dpi=100)
+        self.fig2 = Figure(figsize=(6, 6), dpi=65)
         self.ax2 = self.fig2.add_subplot(111)
         self.canvas2 = FigureCanvas(self.fig2)
+
+        # connect axis activities
+        self.cc = ClickerClass(self.ax1, self.ax2)
 
         # gui setup
         self.set_button()
@@ -189,41 +201,6 @@ class MainFrame(QtGui.QWidget):
         self.slider["zidx"].valueChanged.connect(self.update_zidx)
 
 
-    def update_tmin(self, value):
-        self._tmin = value
-        self.spinbox["tmin"].setValue(value)
-        self.spinbox["tmin"].setRange(0, self._tmax-1)
-
-        self.slider["tidx"].setRange(self._tmin, self._tmax)
-        self.spinbox["tidx"].setRange(self._tmin, self._tmax)
-
-
-    def update_tmax(self, value):
-        self._tmax = value
-        self.spinbox["tmax"].setValue(value)
-        self.spinbox["tmax"].setRange(self._tmin+1, self._tslicenum-1)
-
-        self.slider["tidx"].setRange(self._tmin, self._tmax)
-        self.spinbox["tidx"].setRange(self._tmin, self._tmax)
-
-
-    def update_zmin(self, value):
-        self._zmin = value
-        self.spinbox["zmin"].setValue(value)
-        self.spinbox["zmin"].setRange(0, self._zmax-1)
-
-        self.slider["zidx"].setRange(self._zmin, self._zmax)
-        self.spinbox["zidx"].setRange(self._zmin, self._zmax)
-
-
-    def update_zmax(self, value):
-        self._zmax = value
-        self.spinbox["zmax"].setValue(value)
-        self.spinbox["zmax"].setRange(self._zmin+1, self._zslicenum-1)
-
-        self.slider["zidx"].setRange(self._zmin, self._zmax)
-        self.spinbox["zidx"].setRange(self._zmin, self._zmax)
-
 
     def add_widget(self):
         # add buttons
@@ -312,12 +289,18 @@ class MainFrame(QtGui.QWidget):
         self.grid.addWidget(self.title["tslice"], 7, 0)
         self.grid.addWidget(self.title["zslice"], 8, 0)
 
+        # update cc settings
+        self.cc.reset_setting()
+        self.cc.init_mask(self.cine_mask)
+        self.cc.init_vertex()
+
 
     def update_tidx(self, value):
         if self._loadflag == True:
             self._tidx = value
             self.update_slice()
 
+            self.cc.update_index(self._tidx, self._zidx)
             self.redraw_img()
 
 
@@ -326,7 +309,44 @@ class MainFrame(QtGui.QWidget):
             self._zidx = value
             self.update_slice()
 
+            self.cc.update_index(self._tidx, self._zidx)
             self.redraw_img()
+
+
+    def update_tmin(self, value):
+        self._tmin = value
+        self.spinbox["tmin"].setValue(value)
+        self.spinbox["tmin"].setRange(0, self._tmax-1)
+
+        self.slider["tidx"].setRange(self._tmin, self._tmax)
+        self.spinbox["tidx"].setRange(self._tmin, self._tmax)
+
+
+    def update_tmax(self, value):
+        self._tmax = value
+        self.spinbox["tmax"].setValue(value)
+        self.spinbox["tmax"].setRange(self._tmin+1, self._tslicenum-1)
+
+        self.slider["tidx"].setRange(self._tmin, self._tmax)
+        self.spinbox["tidx"].setRange(self._tmin, self._tmax)
+
+
+    def update_zmin(self, value):
+        self._zmin = value
+        self.spinbox["zmin"].setValue(value)
+        self.spinbox["zmin"].setRange(0, self._zmax-1)
+
+        self.slider["zidx"].setRange(self._zmin, self._zmax)
+        self.spinbox["zidx"].setRange(self._zmin, self._zmax)
+
+
+    def update_zmax(self, value):
+        self._zmax = value
+        self.spinbox["zmax"].setValue(value)
+        self.spinbox["zmax"].setRange(self._zmin+1, self._zslicenum-1)
+
+        self.slider["zidx"].setRange(self._zmin, self._zmax)
+        self.spinbox["zidx"].setRange(self._zmin, self._zmax)
 
 
     def update_slice(self):
@@ -343,19 +363,19 @@ class MainFrame(QtGui.QWidget):
 
         # invalid directory chosen
         if "cine" not in os.listdir(dirname):
-            print("Subject directory must contain 'cine/'\n")
+            print("=Subject directory must contain 'cine/'\n")
             return
 
-        print("\nstart of new session======")
-        print("Subject directory: [%s]" % dirname)
+        print("\n======start of new session")
+        print("=Subject directory: [%s]" % dirname)
         cinedir = dirname + "/cine/"
 
         temp = io.load_cine_from_directory(cinedir)
         if(len(temp.shape) != 4):
-            print("Inavlid cine image")
+            print("=Inavlid cine image")
             return
         elif(temp is None):
-            print("Failed to load cine image")
+            print("=Failed to load cine image")
             return
 
         self.cine_img = temp
@@ -404,3 +424,335 @@ class MainFrame(QtGui.QWidget):
 
     def complete_epicardial_detection(self):
         print("com_epi")
+
+
+class ClickerClass(object):
+    _title = {True: "LEFT: add landmark, RIGHT: delete landmark\n"
+                    "Press 'm' to switch modes",
+              False: "'i': insert, 't': toggle vertex, 'RIGHT': delete\n"
+                     "Press 'Enter' to crop, 'm' to switch modes",
+              "seed": "LEFT: select seed\n"
+                      "Press 'enter' to complete",
+              "mask": "Binary mask\n"}
+
+    _tidx, _zidx = 0, 0 # active slice index
+
+    _loadflag = False
+    _showverts = True
+    _epsilon = 5 # cursor sensitivity in pixels
+    _modes = True # True: Place landmarks, False: Connect landmarks
+    _alpha = 0.30
+    _ind = None # active vertex
+
+    _cid = []
+
+    cine_mask = None # 4d numpy array
+    mask_slice = None # active mask slice
+
+    # artist objects
+    line = None
+    plot = None
+    poly = None
+    verts = None # active position: verts[_tidx][_zidx]
+    position = None
+    background = None
+
+
+    def __init__(self, ax1, ax2):
+        # get axis object
+        self.ax1 = ax1
+        self.ax2 = ax2
+
+        # get figure object
+        self.fig1 = ax1.get_figure()
+        self.fig2 = ax2.get_figure()
+
+        # get canvas object
+        self.canvas1 = self.fig1.canvas
+        self.canvas2 = self.fig2.canvas
+
+        # quick solution for inactive key_press_event
+        self.canvas1.setFocusPolicy(QtCore.Qt.ClickFocus)
+        self.canvas1.setFocus()
+
+        self.ax1.set_title(self._title[True])
+        self.ax2.set_title(self._title["mask"])
+
+        # initiate artist objects
+        self.plot = self.ax1.plot([], [], marker='o', markerfacecolor='b',
+                                        linestyle='none', markersize=5)[0]
+        self.poly = Polygon([(0, 0)], animated=True,
+                                        alpha=self._alpha)
+        self.line = Line2D([], [], marker='o', markerfacecolor='r',
+                                        animated=True, markersize=5)
+
+        # add artist objects to the axis
+        self.ax1.add_patch(self.poly)
+        self.ax1.add_line(self.line)
+
+        self.connect_activity()
+
+
+    def init_vertex(self):
+        tl = self.cine_mask.shape[2]
+        zl = self.cine_mask.shape[3]
+
+        # access: position[tl][zl]
+        self.position = [[[] for i in range(zl)] for j in range(tl)]
+        self.verts = self.position[self._tidx][self._zidx]
+
+
+    def init_mask(self, mask):
+        self.cine_mask = mask
+        self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
+
+
+    def reset_setting(self):
+        self._showverts = True
+        self._modes = True
+
+        self.cine_mask = None
+        self.mask_slice = None
+        self._tidx, self._zidx = 0, 0
+        self._loadflag = True
+
+
+    def update_index(self, tidx, zidx):
+        self._tidx = tidx
+        self._zidx = zidx
+
+        self.switch_slice()
+
+
+    def redraw(self):
+        self.ax1.draw_artist(self.poly)
+        self.ax1.draw_artist(self.line)
+        self.canvas1.blit(self.ax1.bbox)
+
+
+    def replot(self):
+        if len(self.verts) > 0:
+            x, y = zip(*self.verts)
+        else:
+            x, y = [], []
+
+        if self._modes:
+            self.plot.set_xdata(x)
+            self.plot.set_ydata(y)
+
+
+    def switch_slice(self):
+        self.verts = self.position[self._tidx][self._zidx]
+        self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
+
+        if self._modes == False:
+            if len(self.verts) <= 1:
+                self.switch_modes()
+            else:
+                self.poly.xy = np.array(self.verts[:])
+                self.line.set_data(zip(*self.poly.xy))
+        else:
+            self.replot()
+            self.poly.xy = [(0, 0)]
+
+        self.canvas1.draw()
+
+
+    def switch_modes(self):
+        if not self._loadflag: return
+        if not self._showverts: return
+
+        if self._modes:
+            self.switch2poly()
+        else:
+            self.switch2plot()
+
+
+    def switch2plot(self):
+        self._modes = True
+        self.ax1.set_title(self._title[True])
+        self.ax1.set_ylabel("")
+
+        self.replot()
+        if self.poly:
+            self.poly.xy = [(0, 0)]
+
+
+    def switch2poly(self):
+        if len(self.verts) == 0:
+            return
+        self._modes = False
+        self.ax1.set_title(self._title[False])
+        self.ax1.set_ylabel("Alpha: %.2f" %self._alpha)
+
+        self.poly.xy = np.array(self.verts[:])
+        self.line.set_data(zip(*self.poly.xy))
+        self.plot.set_data([], [])
+
+        self.canvas1.draw()
+
+
+    def connect_activity(self):
+        self.canvas1.mpl_connect('button_press_event',  self.button_press_callback)
+        self.canvas1.mpl_connect('button_release_event', self.button_release_callback)
+        self.canvas1.mpl_connect('scroll_event', self.scroll_callback)
+        self.canvas1.mpl_connect('motion_notify_event', self.motion_notify_callback)
+        self.canvas1.mpl_connect('draw_event', self.draw_callback)
+        self.canvas1.mpl_connect('key_press_event', self.key_press_callback)
+
+
+    def button_press_callback(self, event):
+        if not self._showverts: return
+        if not event.inaxes: return
+        if not self._loadflag: return
+
+        self._ind = self.get_nearest_vertex_idx(event)
+        # Do whichever action corresponds to the mouse button clicked
+        if event.button == 1:
+            self.add_vertex(event)
+        elif event.button == 3:
+            self.remove_vertex(event)
+        # Re-plot the landmarks on canvas
+        self.replot()
+        self.canvas1.draw()
+
+
+    def button_release_callback(self, event):
+        if not self._loadflag: return
+        if not self._showverts: return
+
+        self._ind = None
+
+
+    def scroll_callback(self, event):
+        if not self._loadflag: return
+        if not self._showverts: return
+        if self._modes: return
+
+        if event.button == 'up':
+            if self._alpha < 1.00:
+                self._alpha += 0.05
+        elif event.button == 'down':
+            self._alpha -= 0.05
+            if self._alpha <= 0.00:
+                self._alpha = 0.00
+
+        self.ax1.set_ylabel("Alpha: %.2f" % self._alpha)
+        self.poly.set_alpha(self._alpha)
+        self.canvas1.draw()
+
+
+    def motion_notify_callback(self, event):
+        # on mouse movement
+        if not self._showverts: return
+        if not self._loadflag: return
+        if event.button != 1: return
+        if self._ind is None: return
+        if not event.inaxes: return
+
+        self.move_vertex_to(event)
+        self.canvas1.restore_region(self.background)
+        self.redraw()
+
+
+    def draw_callback(self, event):
+        if not self._loadflag:
+            return
+
+        if not self._modes:
+            self.background = self.canvas1.copy_from_bbox(self.ax1.bbox)
+            self.redraw()
+
+
+    def key_press_callback(self, event):
+        if not self._loadflag: return
+        if not event.inaxes: return
+
+        print("key_press active")
+
+        if event.key == 't':
+            # self.switch_vis()
+            pass
+        elif event.key == 'm':
+            self.switch_modes()
+        elif event.key == 'i':
+            self.insert_vertex(event)
+        elif event.key == 'enter':
+            # self.poly2mask()
+            pass
+
+        self.canvas1.draw()
+
+
+    def add_vertex(self, event):
+        # Adds a point at cursor
+        if not self._modes: return
+        if not self._loadflag: return
+
+        if self._modes:
+            self.verts.append((event.xdata, event.ydata))
+
+
+    def insert_vertex(self, event):
+        if self._modes: return
+        if not self._showverts: return
+        if not self._loadflag: return
+
+        p = event.xdata, event.ydata  # display coords
+        mod = len(self.verts)
+        for i in range(len(self.verts)):
+            s0 = self.verts[i % mod]
+            s1 = self.verts[(i + 1) % mod]
+            d = dist_point_to_segment(p, s0, s1)
+            if d <= 5:
+                self.poly.xy = np.array(
+                    list(self.poly.xy[: i+1]) +
+                    [(event.xdata, event.ydata)] +
+                    list(self.poly.xy[i+1 :]))
+                self.line.set_data(zip(*self.poly.xy))
+                self.verts = [tup for i,
+                        tup in enumerate(self.poly.xy) if i != len(self.poly.xy)-1]
+                break
+        print(len(self.verts))
+        print(len(self.position[self._tidx][self._zidx]))
+
+    def remove_vertex(self, event):
+        # Removes the point closest to the cursor
+        if not self._loadflag:
+            return
+
+        index = self._ind
+        if not index is None:
+            del self.verts[index]
+            if not self._modes:
+                if len(self.verts) <= 1:
+                    self.switch_modes()
+                else:
+                    self.poly.xy = [x for x in self.verts]
+                    self.line.set_data(zip(*self.poly.xy))
+
+
+    def get_nearest_vertex_idx(self, event):
+        if len(self.verts) > 0:
+            distance = [(v[0] - event.xdata) ** 2 +
+                        (v[1] - event.ydata) ** 2 for v in self.verts]
+            if np.sqrt(min(distance)) <= self._epsilon:
+                return distance.index(min(distance))
+        return None
+
+
+    def move_vertex_to(self, event):
+        x, y = event.xdata, event.ydata
+        self.poly.xy[self._ind] = x, y
+        self.verts[self._ind] = x, y
+        if self._ind == 0:
+            self.poly.xy[-1] = self.poly.xy[self._ind]
+        self.line.set_data(zip(*self.poly.xy))
+
+
+
+
+
+
+
+
