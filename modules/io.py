@@ -31,14 +31,15 @@ def load_cine_from_directory(cinedir):
             zslice += 1
 
     zcount = 0
-    print("loading cine data", end="")
+    print("=loading cine data", end="")
+    mod = int((zslice/5)+0.5)
 
     for i in range(0, zslice):
         cwdir = cinedir + cine_series[i]
         os.chdir(cwdir)
         session_files = os.listdir()
 
-        if(i % (zslice/5) == 0):
+        if(i % (mod) == 0):
             print(".", end="", flush=True)
 
         tcount = 0
@@ -54,7 +55,7 @@ def load_cine_from_directory(cinedir):
             tcount += 1
         zcount += 1
 
-    print("\ndata dimension: ", end="")
+    print("\n=data dimension: ", end="")
     print(cine_img.shape)
 
     return cine_img
