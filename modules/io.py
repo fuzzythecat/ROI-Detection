@@ -31,7 +31,7 @@ def load_cine_from_directory(cinedir):
             zslice += 1
 
     zcount = 0
-    print("=loading cine data", end="")
+    print("loading cine data", end="")
     mod = int((zslice/5)+0.5)
 
     for i in range(0, zslice):
@@ -55,7 +55,7 @@ def load_cine_from_directory(cinedir):
             tcount += 1
         zcount += 1
 
-    print("\n=data dimension: ", end="")
+    print("\ndata dimension: ", end="")
     print(cine_img.shape)
 
     return cine_img

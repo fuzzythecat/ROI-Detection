@@ -59,13 +59,15 @@ class MainFrame(QtGui.QWidget):
         self.fig1 = Figure(figsize=(6, 6), dpi=65)
         self.ax1 = self.fig1.add_subplot(111)
         self.canvas1 = FigureCanvas(self.fig1)
+        self.canvas1.setParent(self)
 
         self.fig2 = Figure(figsize=(6, 6), dpi=65)
         self.ax2 = self.fig2.add_subplot(111)
         self.canvas2 = FigureCanvas(self.fig2)
+        self.canvas2.setParent(self)
 
         # connect axis activities
-        self.cc = ClickerClass(self.ax1, self.ax2)
+        self.cc = ClickerClass(self.ax1, self.ax2, self.canvas1, self.canvas2)
 
         # gui setup
         self.set_button()
@@ -363,19 +365,19 @@ class MainFrame(QtGui.QWidget):
 
         # invalid directory chosen
         if "cine" not in os.listdir(dirname):
-            print("=Subject directory must contain 'cine/'\n")
+            print("Subject directory must contain 'cine/'\n")
             return
 
-        print("\n======start of new session")
-        print("=Subject directory: [%s]" % dirname)
+        # print("\n======start of new session")
+        print("\nSubject directory: [%s]" % dirname)
         cinedir = dirname + "/cine/"
 
         temp = io.load_cine_from_directory(cinedir)
         if(len(temp.shape) != 4):
-            print("=Inavlid cine image")
+            print("Inavlid cine image")
             return
         elif(temp is None):
-            print("=Failed to load cine image")
+            print("Failed to load cine image")
             return
 
         self.cine_img = temp
@@ -458,7 +460,7 @@ class ClickerClass(object):
     background = None
 
 
-    def __init__(self, ax1, ax2):
+    def __init__(self, ax1, ax2, canvas1, canvas2):
         # get axis object
         self.ax1 = ax1
         self.ax2 = ax2
@@ -468,8 +470,13 @@ class ClickerClass(object):
         self.fig2 = ax2.get_figure()
 
         # get canvas object
-        self.canvas1 = self.fig1.canvas
-        self.canvas2 = self.fig2.canvas
+        #self.canvas1 = self.fig1.canvas
+        #self.canvas2 = self.fig2.canvas
+
+        self.canvas1 = canvas1
+        self.canvas2 = canvas2
+
+        #self.canvas = canvas
 
         # quick solution for inactive key_press_event
         self.canvas1.setFocusPolicy(QtCore.Qt.ClickFocus)
@@ -544,6 +551,7 @@ class ClickerClass(object):
     def switch_slice(self):
         self.verts = self.position[self._tidx][self._zidx]
         self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
+        self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
 
         if self._modes == False:
             if len(self.verts) <= 1:
@@ -556,6 +564,7 @@ class ClickerClass(object):
             self.poly.xy = [(0, 0)]
 
         self.canvas1.draw()
+        self.canvas2.draw()
 
 
     def switch_modes(self):
@@ -581,6 +590,7 @@ class ClickerClass(object):
     def switch2poly(self):
         if len(self.verts) == 0:
             return
+
         self._modes = False
         self.ax1.set_title(self._title[False])
         self.ax1.set_ylabel("Alpha: %.2f" %self._alpha)
@@ -588,8 +598,6 @@ class ClickerClass(object):
         self.poly.xy = np.array(self.verts[:])
         self.line.set_data(zip(*self.poly.xy))
         self.plot.set_data([], [])
-
-        self.canvas1.draw()
 
 
     def connect_activity(self):
@@ -637,17 +645,19 @@ class ClickerClass(object):
             if self._alpha <= 0.00:
                 self._alpha = 0.00
 
+        #print("alpha changed")
         self.ax1.set_ylabel("Alpha: %.2f" % self._alpha)
         self.poly.set_alpha(self._alpha)
+        self.ax1.draw_artist(self.ax1.yaxis)
         self.canvas1.draw()
 
 
     def motion_notify_callback(self, event):
         # on mouse movement
+        if self._ind is None: return
         if not self._showverts: return
         if not self._loadflag: return
         if event.button != 1: return
-        if self._ind is None: return
         if not event.inaxes: return
 
         self.move_vertex_to(event)
@@ -668,7 +678,7 @@ class ClickerClass(object):
         if not self._loadflag: return
         if not event.inaxes: return
 
-        print("key_press active")
+        # print("key_press active")
 
         if event.key == 't':
             # self.switch_vis()
@@ -678,10 +688,26 @@ class ClickerClass(object):
         elif event.key == 'i':
             self.insert_vertex(event)
         elif event.key == 'enter':
-            # self.poly2mask()
-            pass
+            self.poly2mask()
 
         self.canvas1.draw()
+
+
+    def poly2mask(self):
+        if self._modes: return
+        # if not self.verts: return
+
+        for x in range(self.cine_mask.shape[1]):
+            for y in range(self.cine_mask.shape[0]):
+                if self.poly.get_path().contains_point((x,y)):
+                    #self.covered_pixels.append((x,y))
+                    self.mask_slice[y][x] = 1
+                else:
+                    self.mask_slice[y][x] = 0
+
+        self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
+        self.canvas2.draw()
+
 
 
     def add_vertex(self, event):
@@ -713,8 +739,9 @@ class ClickerClass(object):
                 self.verts = [tup for i,
                         tup in enumerate(self.poly.xy) if i != len(self.poly.xy)-1]
                 break
-        print(len(self.verts))
-        print(len(self.position[self._tidx][self._zidx]))
+
+        self.position[self._tidx][self._zidx] = self.verts
+
 
     def remove_vertex(self, event):
         # Removes the point closest to the cursor

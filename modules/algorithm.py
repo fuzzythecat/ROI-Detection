@@ -29,7 +29,7 @@ def resize(img, **kwargs):
     tl = img.shape[2]
     zl = img.shape[3]
 
-    print("=resizing cine data.....")
+    print("resizing cine data.....")
 
     if mode == 64:
         temp = zeros((256, 256, tl, zl))
@@ -56,7 +56,7 @@ def resize(img, **kwargs):
         elif(xl <= 256 and yl <= 256):
             ret[256-xl:, 256-yl:, :, :] = img[:, :, :, :]
 
-    print("=resized dimension: ", ret.shape)
+    print("resized dimension: ", ret.shape)
 
     return ret
 
