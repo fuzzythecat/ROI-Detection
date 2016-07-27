@@ -1,3 +1,65 @@
+def endocardial_detection(img, seed):
+    """
+    Wrapper function for SimpleITK image segmetation.
+    Detect and crop binary mask from image from given seed point.
+
+    Parameters
+    ----------
+    img : 2-dimensional numpy array image
+
+    seed : [(x, y)] position value to run segmentation from
+
+    Returns
+    -------
+    seg_arr : 2-dimensional numpy array binary mask
+    """
+    import SimpleITK as sitk
+
+    img_itk = sitk.GetImageFromArray(img)
+    seg = sitk.Image(img_itk.GetSize(), sitk.sitkUInt8)
+    seg.CopyInformation(img_itk)
+    seg[seed] = 1
+
+    seg = sitk.BinaryDilate(seg, 3)
+    seg = sitk.ConnectedThreshold(img_itk, seedList=[seed],
+                                  lower=300, upper=650)
+
+    seg_arr = sitk.GetArrayFromImage(seg)
+
+    return seg_arr
+
+
+def convex_hull(binary_mask):
+    """
+    Wrapper funcion for scipy.spatial.ConvexHull. From 2-dimensional
+    binary mask, return 1-dimensional list of hull vertices.
+
+    Parameters
+    ----------
+    binary_mask : A binary mask, numpy array of dimension 4.
+
+    Returns
+    -------
+    position : 1-dimensional list of hull vertices.
+    """
+    from scipy.spatial import ConvexHull
+
+    points = []
+
+    for x in range(binary_mask.shape[0]):
+        for y in range(binary_mask.shape[1]):
+            if binary_mask[x][y] > 0.:
+                points.append([y, x])
+
+    hull = ConvexHull(points)
+
+    position = []
+    for idx in hull.vertices:
+        position.append(points[idx])
+
+    return position
+
+
 def resize(img, **kwargs):
     """
     Resize 272*232 2-dimensioanl image slice to 256*256 || 64*64.
@@ -185,5 +247,8 @@ def normalize(img):
         return _patch_rescale(ret)
     elif dim == 4:
         return _img_rescale(ret)
+
+
+
 
 
