@@ -2,6 +2,7 @@ import os
 import sys
 import dicom
 import numpy as np
+import SimpleITK as sitk
 
 from matplotlib import use
 use("Qt4Agg")
@@ -17,7 +18,6 @@ from PyQt4 import QtGui
 
 from modules import io
 from modules import algorithm
-
 
 from pprint import pprint
 
@@ -45,7 +45,7 @@ class MainFrame(QtGui.QWidget):
     slider = {}
     title = {}
 
-    # ClickerClass connected with axis
+    # ClickerClass connected with given axis
     cc = None
 
     valueChanged = QtCore.pyqtSignal(int)
@@ -85,9 +85,9 @@ class MainFrame(QtGui.QWidget):
         self.btn["load"] = QtGui.QPushButton("Load Subject Directory")
         self.btn["save"] = QtGui.QPushButton("Save")
         self.btn["endo1"] = QtGui.QPushButton("All")
-        self.btn["endo2"] = QtGui.QPushButton("Current")
+        self.btn["endo2"] = QtGui.QPushButton("Singular")
         self.btn["epic1"] = QtGui.QPushButton("All")
-        self.btn["epic2"] = QtGui.QPushButton("Current")
+        self.btn["epic2"] = QtGui.QPushButton("Singular")
 
 
     def set_title(self):
@@ -203,7 +203,6 @@ class MainFrame(QtGui.QWidget):
         self.slider["zidx"].valueChanged.connect(self.update_zidx)
 
 
-
     def add_widget(self):
         # add buttons
         self.grid.addWidget(self.btn["load"], 0, 0)
@@ -294,7 +293,10 @@ class MainFrame(QtGui.QWidget):
         # update cc settings
         self.cc.reset_setting()
         self.cc.init_mask(self.cine_mask)
+        self.cc.init_img(self.cine_img)
         self.cc.init_vertex()
+        self.cc.update_tlimit(self._tmin, self._tmax)
+        self.cc.update_zlimit(self._zmin, self._zmax)
 
 
     def update_tidx(self, value):
@@ -323,6 +325,8 @@ class MainFrame(QtGui.QWidget):
         self.slider["tidx"].setRange(self._tmin, self._tmax)
         self.spinbox["tidx"].setRange(self._tmin, self._tmax)
 
+        self.cc.update_tlimit(self._tmin, self._tmax)
+
 
     def update_tmax(self, value):
         self._tmax = value
@@ -331,6 +335,8 @@ class MainFrame(QtGui.QWidget):
 
         self.slider["tidx"].setRange(self._tmin, self._tmax)
         self.spinbox["tidx"].setRange(self._tmin, self._tmax)
+
+        self.cc.update_tlimit(self._tmin, self._tmax)
 
 
     def update_zmin(self, value):
@@ -341,6 +347,8 @@ class MainFrame(QtGui.QWidget):
         self.slider["zidx"].setRange(self._zmin, self._zmax)
         self.spinbox["zidx"].setRange(self._zmin, self._zmax)
 
+        self.cc.update_zlimit(self._zmin, self._zmax)
+
 
     def update_zmax(self, value):
         self._zmax = value
@@ -349,6 +357,8 @@ class MainFrame(QtGui.QWidget):
 
         self.slider["zidx"].setRange(self._zmin, self._zmax)
         self.spinbox["zidx"].setRange(self._zmin, self._zmax)
+
+        self.cc.update_zlimit(self._zmin, self._zmax)
 
 
     def update_slice(self):
@@ -413,43 +423,55 @@ class MainFrame(QtGui.QWidget):
 
 
     def singular_endocardial_detection(self):
-        print("sin_end")
+        print("Singular endocardial detection")
+        self.cc.set_singular()
+        self.cc.switch2seed()
 
 
     def complete_endocardial_detection(self):
-        print("com_end")
+        self.cc.set_complete()
+        self.cc.switch2seed()
 
 
     def singular_epicardial_detection(self):
+        self.cc.set_singular()
         print("sin_epi")
 
 
     def complete_epicardial_detection(self):
+        self.cc.set_complete()
         print("com_epi")
 
 
 class ClickerClass(object):
-    _title = {True: "LEFT: add landmark, RIGHT: delete landmark\n"
+    _title = {"plot": "LEFT: add landmark, RIGHT: delete landmark\n"
                     "Press 'm' to switch modes",
-              False: "'i': insert, 't': toggle vertex, 'RIGHT': delete\n"
+              "connect": "'i': insert, 't': toggle vertex, 'RIGHT': delete\n"
                      "Press 'Enter' to crop, 'm' to switch modes",
               "seed": "LEFT: select seed\n"
                       "Press 'enter' to complete",
               "mask": "Binary mask\n"}
 
     _tidx, _zidx = 0, 0 # active slice index
+    _tmin, _tmax = 0, 100 # index range [_tmin, _tmax) for detection
+    _zmin, _zmax = 0, 100 # index range [_zmin, _zmax) for detection
 
+    _detectionflag = None
     _loadflag = False
     _showverts = True
     _epsilon = 5 # cursor sensitivity in pixels
-    _modes = True # True: Place landmarks, False: Connect landmarks
+    _modes = "plot"
+    # True: Place landmarks, False: Connect landmarks
     _alpha = 0.30
     _ind = None # active vertex
+    _seed = [] # seed point for endocardial detection
 
     _cid = []
 
+    cine_img = None # 4d numpy array
     cine_mask = None # 4d numpy array
     mask_slice = None # active mask slice
+    cropped = None # 4d numpy array
 
     # artist objects
     line = None
@@ -470,19 +492,14 @@ class ClickerClass(object):
         self.fig2 = ax2.get_figure()
 
         # get canvas object
-        #self.canvas1 = self.fig1.canvas
-        #self.canvas2 = self.fig2.canvas
-
         self.canvas1 = canvas1
         self.canvas2 = canvas2
-
-        #self.canvas = canvas
 
         # quick solution for inactive key_press_event
         self.canvas1.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.canvas1.setFocus()
 
-        self.ax1.set_title(self._title[True])
+        self.ax1.set_title(self._title["plot"])
         self.ax2.set_title(self._title["mask"])
 
         # initiate artist objects
@@ -509,19 +526,28 @@ class ClickerClass(object):
         self.verts = self.position[self._tidx][self._zidx]
 
 
+    def init_img(self, img):
+        self.cine_img = img
+
+
     def init_mask(self, mask):
         self.cine_mask = mask
         self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
+        self.cropped = np.zeros(self.cine_mask.shape)
 
 
     def reset_setting(self):
         self._showverts = True
-        self._modes = True
+        self._modes = "plot"
 
         self.cine_mask = None
         self.mask_slice = None
+        self._seed = []
         self._tidx, self._zidx = 0, 0
+        self._tmin, self._zmax = 0, 100
+        self._tmin, self._zmax = 0, 100
         self._loadflag = True
+        self._detectionflag = None
 
 
     def update_index(self, tidx, zidx):
@@ -531,6 +557,16 @@ class ClickerClass(object):
         self.switch_slice()
 
 
+    def update_tlimit(self, tmin, tmax):
+        self._tmin = tmin
+        self._tmax = tmax
+
+
+    def update_zlimit(self, zmin, zmax):
+        self._zmin = zmin
+        self._zmax = zmax
+
+
     def redraw(self):
         self.ax1.draw_artist(self.poly)
         self.ax1.draw_artist(self.line)
@@ -538,12 +574,17 @@ class ClickerClass(object):
 
 
     def replot(self):
-        if len(self.verts) > 0:
-            x, y = zip(*self.verts)
+        if self._modes == "seed":
+            verts = self._seed[:]
+        else:
+            verts = self.verts[:]
+
+        if len(verts) > 0:
+            x, y = zip(*verts)
         else:
             x, y = [], []
 
-        if self._modes:
+        if not self._modes == "connect":
             self.plot.set_xdata(x)
             self.plot.set_ydata(y)
 
@@ -553,7 +594,7 @@ class ClickerClass(object):
         self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
         self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
 
-        if self._modes == False:
+        if self._modes == "connect":
             if len(self.verts) <= 1:
                 self.switch_modes()
             else:
@@ -570,16 +611,31 @@ class ClickerClass(object):
     def switch_modes(self):
         if not self._loadflag: return
         if not self._showverts: return
+        if self._modes == "seed": return
 
-        if self._modes:
+        if self._modes == "plot":
             self.switch2poly()
-        else:
+        elif self._modes == "connect":
             self.switch2plot()
 
 
+    def switch2seed(self):
+        self._modes = "seed"
+        self.ax1.set_title(self._title["seed"])
+        self.ax1.set_ylabel("")
+
+        # clears the existing plot
+        # self.verts.clear()
+        self.replot()
+        if self.poly:
+            self.poly.xy = [(0, 0)]
+
+        self.canvas1.draw()
+
+
     def switch2plot(self):
-        self._modes = True
-        self.ax1.set_title(self._title[True])
+        self._modes = "plot"
+        self.ax1.set_title(self._title["plot"])
         self.ax1.set_ylabel("")
 
         self.replot()
@@ -591,8 +647,8 @@ class ClickerClass(object):
         if len(self.verts) == 0:
             return
 
-        self._modes = False
-        self.ax1.set_title(self._title[False])
+        self._modes = "connect"
+        self.ax1.set_title(self._title["connect"])
         self.ax1.set_ylabel("Alpha: %.2f" %self._alpha)
 
         self.poly.xy = np.array(self.verts[:])
@@ -635,7 +691,7 @@ class ClickerClass(object):
     def scroll_callback(self, event):
         if not self._loadflag: return
         if not self._showverts: return
-        if self._modes: return
+        if not self._modes == "connect": return
 
         if event.button == 'up':
             if self._alpha < 1.00:
@@ -648,7 +704,7 @@ class ClickerClass(object):
         #print("alpha changed")
         self.ax1.set_ylabel("Alpha: %.2f" % self._alpha)
         self.poly.set_alpha(self._alpha)
-        self.ax1.draw_artist(self.ax1.yaxis)
+        # self.ax1.draw_artist(self.ax1.yaxis)
         self.canvas1.draw()
 
 
@@ -656,9 +712,11 @@ class ClickerClass(object):
         # on mouse movement
         if self._ind is None: return
         if not self._showverts: return
+        if self._modes == "seed": return
         if not self._loadflag: return
         if event.button != 1: return
         if not event.inaxes: return
+
 
         self.move_vertex_to(event)
         self.canvas1.restore_region(self.background)
@@ -669,7 +727,7 @@ class ClickerClass(object):
         if not self._loadflag:
             return
 
-        if not self._modes:
+        if self._modes == "connect":
             self.background = self.canvas1.copy_from_bbox(self.ax1.bbox)
             self.redraw()
 
@@ -688,14 +746,20 @@ class ClickerClass(object):
         elif event.key == 'i':
             self.insert_vertex(event)
         elif event.key == 'enter':
-            self.poly2mask()
+            if self._modes == "connect":
+                self.poly2mask()
+            elif self._detectionflag == "singular":
+                self.singular_endocardial_detection()
+            elif self._detectionflag == "complete":
+                self.complete_endocardial_detection()
+
 
         self.canvas1.draw()
 
 
     def poly2mask(self):
-        if self._modes: return
-        # if not self.verts: return
+        if not self._modes == "connect":
+            return
 
         for x in range(self.cine_mask.shape[1]):
             for y in range(self.cine_mask.shape[0]):
@@ -705,22 +769,32 @@ class ClickerClass(object):
                 else:
                     self.mask_slice[y][x] = 0
 
+        if(len(self.verts) > 2):
+            self.cropped[self._tidx][self._zidx] = True
+        else:
+            self.cropped[self._tidx][self._zidx] = False
+
         self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
         self.canvas2.draw()
 
 
-
     def add_vertex(self, event):
         # Adds a point at cursor
-        if not self._modes: return
-        if not self._loadflag: return
+        if self._modes == "connect":
+            return
+        if not self._loadflag:
+            return
 
-        if self._modes:
-            self.verts.append((event.xdata, event.ydata))
+        if self._modes == "seed":
+            verts = self._seed
+            verts.clear()
+        else:
+            verts = self.verts
+        verts.append((int(event.xdata), int(event.ydata)))
 
 
     def insert_vertex(self, event):
-        if self._modes: return
+        if not self._modes == "connect": return
         if not self._showverts: return
         if not self._loadflag: return
 
@@ -732,12 +806,12 @@ class ClickerClass(object):
             d = dist_point_to_segment(p, s0, s1)
             if d <= 5:
                 self.poly.xy = np.array(
-                    list(self.poly.xy[: i+1]) +
-                    [(event.xdata, event.ydata)] +
-                    list(self.poly.xy[i+1 :]))
+                               list(self.poly.xy[: i+1]) +
+                               [(event.xdata, event.ydata)] +
+                               list(self.poly.xy[i+1 :]))
                 self.line.set_data(zip(*self.poly.xy))
                 self.verts = [tup for i,
-                        tup in enumerate(self.poly.xy) if i != len(self.poly.xy)-1]
+                              tup in enumerate(self.poly.xy) if i != len(self.poly.xy)-1]
                 break
 
         self.position[self._tidx][self._zidx] = self.verts
@@ -747,11 +821,13 @@ class ClickerClass(object):
         # Removes the point closest to the cursor
         if not self._loadflag:
             return
+        if self._modes == "seed":
+            return
 
         index = self._ind
         if not index is None:
             del self.verts[index]
-            if not self._modes:
+            if self._modes == "connect":
                 if len(self.verts) <= 1:
                     self.switch_modes()
                 else:
@@ -777,9 +853,49 @@ class ClickerClass(object):
         self.line.set_data(zip(*self.poly.xy))
 
 
+    def singular_endocardial_detection(self):
+        if not self._modes == "seed":
+            return
+
+        img_slice = self.cine_img[:, :, self._tidx, self._zidx]
 
 
+        print("seed set at", (int(self._seed[0][0]),\
+                              int(self._seed[0][1])))
+        print("segmenting mask...")
+
+        self.mask_slice[:, :] = \
+            algorithm.endocardial_detection(img_slice,
+            (int(self._seed[0][0]), int(self._seed[0][1])))[:, :]
+
+        print("calculating hull...")
+        self.verts[:] = algorithm.convex_hull(self.mask_slice)
+        self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
+
+        self.switch2poly()
+        self._seed = []
+
+        self.canvas1.draw()
+        self.canvas2.draw()
 
 
+    def complete_endocardial_detection(self):
+        if not self._modes == "seed":
+            return
+
+        print("run complete")
+
+
+    def set_seed_point(self):
+        self._seed = (int(self.verts[0][0]), int(self.verts[0][1]))
+        print("seed set at:", self._seed)
+
+
+    def set_singular(self):
+        self._detectionflag = "singular"
+
+
+    def set_complete(self):
+        self._detectionflag = "complete"
 
 
