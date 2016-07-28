@@ -55,7 +55,8 @@ def load_cine_from_directory(cinedir):
             tcount += 1
         zcount += 1
 
-    print("\ndata dimension: ", end="")
+    print(" complete")
+    print("data dimension: ", end="")
     print(cine_img.shape)
 
     return cine_img

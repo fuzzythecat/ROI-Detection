@@ -84,9 +84,9 @@ class MainFrame(QtGui.QWidget):
     def set_button(self):
         self.btn["load"] = QtGui.QPushButton("Load Subject Directory")
         self.btn["save"] = QtGui.QPushButton("Save")
-        self.btn["endo1"] = QtGui.QPushButton("All")
+        self.btn["endo1"] = QtGui.QPushButton("Multiple")
         self.btn["endo2"] = QtGui.QPushButton("Singular")
-        self.btn["epic1"] = QtGui.QPushButton("All")
+        self.btn["epic1"] = QtGui.QPushButton("Multiple")
         self.btn["epic2"] = QtGui.QPushButton("Singular")
 
 
@@ -182,9 +182,9 @@ class MainFrame(QtGui.QWidget):
         # connect buttons
         self.btn["load"].clicked.connect(self.load_directory)
         self.btn["save"].clicked.connect(self.save_img)
-        self.btn["endo1"].clicked.connect(self.complete_endocardial_detection)
+        self.btn["endo1"].clicked.connect(self.multiple_endocardial_detection)
         self.btn["endo2"].clicked.connect(self.singular_endocardial_detection)
-        self.btn["epic1"].clicked.connect(self.complete_epicardial_detection)
+        self.btn["epic1"].clicked.connect(self.multiple_epicardial_detection)
         self.btn["epic2"].clicked.connect(self.singular_epicardial_detection)
 
         # connect spinboxes
@@ -298,6 +298,8 @@ class MainFrame(QtGui.QWidget):
         self.cc.update_tlimit(self._tmin, self._tmax)
         self.cc.update_zlimit(self._zmin, self._zmax)
 
+        # self.canvas1.draw()
+        # self.canvas2.draw()
 
     def update_tidx(self, value):
         if self._loadflag == True:
@@ -418,28 +420,46 @@ class MainFrame(QtGui.QWidget):
 
 
     def save_img(self):
+        if self._loadflag == False:
+            return
+
         fname = io.save_file_dialog()
         print(fname)
 
 
     def singular_endocardial_detection(self):
-        print("Singular endocardial detection")
+        if self._loadflag == False:
+            return
+
+        print("\nInitializing singular endocardial detection..... ", end="")
         self.cc.set_singular()
         self.cc.switch2seed()
+        # print("complete")
 
 
-    def complete_endocardial_detection(self):
-        self.cc.set_complete()
+    def multiple_endocardial_detection(self):
+        if self._loadflag == False:
+            return
+
+        print("\nInitializing multiple endocardial detection..... ", end="")
+        self.cc.set_multiple()
         self.cc.switch2seed()
+        # print("complete")
 
 
     def singular_epicardial_detection(self):
+        if self._loadflag == False:
+            return
+
         self.cc.set_singular()
         print("sin_epi")
 
 
-    def complete_epicardial_detection(self):
-        self.cc.set_complete()
+    def multiple_epicardial_detection(self):
+        if self._loadflag == False:
+            return
+
+        self.cc.set_multiple()
         print("com_epi")
 
 
@@ -450,17 +470,18 @@ class ClickerClass(object):
                      "Press 'Enter' to crop, 'm' to switch modes",
               "seed": "LEFT: select seed\n"
                       "Press 'enter' to complete",
-              "mask": "Binary mask\n"}
+              "mask": "Binary mask\n",
+              "init": "Cine image\n"}
 
     _tidx, _zidx = 0, 0 # active slice index
-    _tmin, _tmax = 0, 100 # index range [_tmin, _tmax) for detection
-    _zmin, _zmax = 0, 100 # index range [_zmin, _zmax) for detection
+    _tmin, _tmax = 0, 100 # index range [_tmin, _tmax] for detection
+    _zmin, _zmax = 0, 100 # index range [_zmin, _zmax] for detection
 
     _detectionflag = None
     _loadflag = False
     _showverts = True
     _epsilon = 5 # cursor sensitivity in pixels
-    _modes = "plot"
+    _modes = "init"
     # True: Place landmarks, False: Connect landmarks
     _alpha = 0.30
     _ind = None # active vertex
@@ -499,7 +520,7 @@ class ClickerClass(object):
         self.canvas1.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.canvas1.setFocus()
 
-        self.ax1.set_title(self._title["plot"])
+        self.ax1.set_title(self._title["init"])
         self.ax2.set_title(self._title["mask"])
 
         # initiate artist objects
@@ -533,12 +554,13 @@ class ClickerClass(object):
     def init_mask(self, mask):
         self.cine_mask = mask
         self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
-        self.cropped = np.zeros(self.cine_mask.shape)
+        self.cropped = np.zeros((self.cine_mask.shape[2], self.cine_mask.shape[3]))
 
 
     def reset_setting(self):
         self._showverts = True
         self._modes = "plot"
+        self.ax1.set_title(self._title[self._modes])
 
         self.cine_mask = None
         self.mask_slice = None
@@ -750,9 +772,8 @@ class ClickerClass(object):
                 self.poly2mask()
             elif self._detectionflag == "singular":
                 self.singular_endocardial_detection()
-            elif self._detectionflag == "complete":
-                self.complete_endocardial_detection()
-
+            elif self._detectionflag == "multiple":
+                self.multiple_endocardial_detection()
 
         self.canvas1.draw()
 
@@ -858,44 +879,123 @@ class ClickerClass(object):
             return
 
         img_slice = self.cine_img[:, :, self._tidx, self._zidx]
+        if len(self._seed) == 0:
+            return
 
-
+        print("complete")
         print("seed set at", (int(self._seed[0][0]),\
                               int(self._seed[0][1])))
-        print("segmenting mask...")
+        print("segmenting mask..... ", end="")
 
         self.mask_slice[:, :] = \
             algorithm.endocardial_detection(img_slice,
             (int(self._seed[0][0]), int(self._seed[0][1])))[:, :]
 
-        print("calculating hull...")
-        self.verts[:] = algorithm.convex_hull(self.mask_slice)
-        self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
+        # if valid mask
+        if int(np.sum(self.mask_slice)) != 0:
+            self.cropped[self._tidx][self._zidx] = True
 
-        self.switch2poly()
+            print("complete")
+            print("calculating hull..... ", end="")
+
+            try:
+                self.verts[:] = algorithm.convex_hull(self.mask_slice)
+            except:
+                print("failure")
+
+            print("complete")
+
+            self.switch2poly()
+            self.poly2mask()
+        else:
+            print("segmentation failure")
+            self.switch2plot()
+            self.cropped[self._tidx][self._zidx] = False
+
         self._seed = []
-
         self.canvas1.draw()
-        self.canvas2.draw()
 
 
-    def complete_endocardial_detection(self):
+    def multiple_endocardial_detection(self):
         if not self._modes == "seed":
             return
 
-        print("run complete")
+        if len(self._seed) == 0:
+            return
 
+        print("complete")
+        print("seed set at", (int(self._seed[0][0]),\
+                              int(self._seed[0][1])))
 
-    def set_seed_point(self):
-        self._seed = (int(self.verts[0][0]), int(self.verts[0][1]))
-        print("seed set at:", self._seed)
+        print("segmenting mask ", end="")
+        # mod = int(((self._tmin+self._tmax)/5)+0.5)
+        for t in range(self._tmin, self._tmax+1):
+
+            # status bar
+            # if mod != 0 && t%mod == 0:
+            #    print(".", end="", flush=True)
+
+            for z in range(self._zmin, self._zmax+1):
+                img_slice = self.cine_img[:, :, t, z]
+                self.mask_slice = self.cine_mask[:, :, t, z]
+                self.mask_slice[:, :] = \
+                               algorithm.endocardial_detection(img_slice,
+                               (int(self._seed[0][0]), int(self._seed[0][1])))[:, :]
+
+                if int(np.sum(self.mask_slice)) != 0:
+                   self.cropped[t][z] = True
+                else:
+                    self.cropped[t][z] = False
+
+        print("complete")
+
+        print("calculating hull", end="")
+        for t in range(self._tmin, self._tmax+1):
+
+            # status bar
+            #if t%(mod) == 0:
+            #    print(".", end="", flush=True)
+
+            for z in range(self._zmin, self._zmax+1):
+
+                if self.cropped[t][z] == False:
+                    continue
+                self.mask_slice = self.cine_mask[:, :, t, z]
+                # self.verts = self.position[t][z]
+
+                self.position[t][z] = algorithm.convex_hull(self.mask_slice)
+
+                self.poly.xy = np.array(self.position[t][z])
+                for x in range(self.mask_slice.shape[1]):
+                    for y in range(self.mask_slice.shape[0]):
+                        if self.poly.get_path().contains_point((x,y)):
+                            self.mask_slice[y][x] = 1
+                        else:
+                            self.mask_slice[y][x] = 0
+
+        print(" complete")
+        # print("")
+
+        self.verts = self.position[self._tidx][self._zidx]
+        self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
+
+        self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
+        self._seed = []
+
+        if len(self.verts) <= 2:
+            self.switch2plot()
+        else:
+            self.switch2poly()
+
+        self.canvas1.draw()
+        self.canvas2.draw()
 
 
     def set_singular(self):
         self._detectionflag = "singular"
 
 
-    def set_complete(self):
-        self._detectionflag = "complete"
+    def set_multiple(self):
+        self._detectionflag = "multiple"
 
 
