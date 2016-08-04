@@ -25,8 +25,7 @@ dat = ds.pixel_array
 #print(data.shape)
 
 app = QApplication(sys.argv)
-fig = gui.MainFrame()
-fig.show()
+fig = gui.MainWindow()
 app.exec_()
 
 '''
