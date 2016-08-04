@@ -1,37 +1,111 @@
 import os
-import sys
-import dicom
 import numpy as np
-import SimpleITK as sitk
-
 from matplotlib import use
 use("Qt4Agg")
+
+from matplotlib.lines import Line2D
 from matplotlib import pyplot as plt
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.patches import Polygon
-from matplotlib.lines import Line2D
 from matplotlib.mlab import dist_point_to_segment
-
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt4 import QtCore
 from PyQt4 import QtGui
 
 from modules import io
 from modules import algorithm
 
-from pprint import pprint
+
+class MainWindow(QtGui.QMainWindow):
+
+
+    def __init__(self):
+        super(MainWindow, self).__init__()
+
+        # add main widget
+        self.fig = MainFrame()
+        _widget = QtGui.QWidget()
+        _layout = QtGui.QVBoxLayout(_widget)
+        _layout.addWidget(self.fig)
+        self.setCentralWidget(_widget)
+
+        # set window title
+        self.setWindowTitle("Border Detection")
+
+        self.set_menubar()
+        self.show()
+
+
+    def set_menubar(self):
+        loadDirectory = QtGui.QAction("Load", self)
+        loadDirectory.setShortcut("Ctrl+L")
+        loadDirectory.setStatusTip("Load patient directory")
+        loadDirectory.triggered.connect(self.fig.load_directory)
+
+        saveData = QtGui.QAction("Save", self)
+        saveData.setShortcut("Ctrl+S")
+        saveData.setStatusTip("Save patient data")
+        saveData.triggered.connect(self.fig.save_img)
+
+        showEndocardium = QtGui.QAction("Endocardium", self)
+        showEndocardium.setStatusTip("Show endocardial binary mask")
+
+        showEpicardium = QtGui.QAction("Epicardium", self)
+        showEpicardium.setStatusTip("Show epicardial binary mask")
+
+        showMyocardium = QtGui.QAction("Myocardium", self)
+        showMyocardium.setStatusTip("Show mycardial binary mask")
+
+        singularEndoDetection = QtGui.QAction("Singular", self)
+        singularEndoDetection.setStatusTip("Detect endocardial border on the current slice")
+        singularEndoDetection.triggered.connect(self.fig.singular_endocardial_detection)
+
+        multipleEndoDetection = QtGui.QAction("Multiple", self)
+        multipleEndoDetection.setStatusTip("Detect endocardial borders on valid slices")
+        multipleEndoDetection.triggered.connect(self.fig.multiple_endocardial_detection)
+
+        singularEpicDetection = QtGui.QAction("Singular", self)
+        singularEpicDetection.setStatusTip("Detect epicardial border on the current slice")
+        singularEpicDetection.triggered.connect(self.fig.singular_epicardial_detection)
+
+        multipleEpicDetection = QtGui.QAction("Multiple", self)
+        multipleEpicDetection.setStatusTip("Detect epicardial borders on valid slices")
+        multipleEpicDetection.triggered.connect(self.fig.multiple_epicardial_detection)
+
+        self.statusBar()
+
+        mainMenu = self.menuBar()
+
+        fileMenu = mainMenu.addMenu("&File")
+        fileMenu.addAction(loadDirectory)
+        fileMenu.addAction(saveData)
+
+        detectionMenu = mainMenu.addMenu("&Detection")
+        endoMenu = detectionMenu.addMenu("&Endocardial Detection")
+        epicMenu = detectionMenu.addMenu("&Epicardial Detection")
+
+        endoMenu.addAction(singularEndoDetection)
+        endoMenu.addAction(multipleEndoDetection)
+        epicMenu.addAction(singularEpicDetection)
+        epicMenu.addAction(multipleEpicDetection)
+
+        viewMenu = mainMenu.addMenu("&Display")
+        viewMenu.addAction(showEndocardium)
+        viewMenu.addAction(showEpicardium)
+        viewMenu.addAction(showMyocardium)
+
 
 class MainFrame(QtGui.QWidget):
 
-    _tidx = 0 # active t slice index
-    _zidx = 0 # active z slice index
+    tidx = 0 # active t slice index
+    zidx = 0 # active z slice index
 
-    _loadflag = False
+    loadflag = False
 
-    _tslicenum = 100 # original index range [0, _tslicenum)
-    _zslicenum = 100 # original index range [0, _zslicenum)
-    _tmin, _tmax = 0, 100 # index range [_tmin, _tmax) for t index in use
-    _zmin, _zmax = 0, 100 # index range [_zmin, _zmax) for z index in use
+    tslicenum = 100 # original index range [0, _tslicenum)
+    zslicenum = 100 # original index range [0, _zslicenum)
+    tmin, tmax = 0, 100 # index range [_tmin, _tmax) for t index in use
+    zmin, zmax = 0, 100 # index range [_zmin, _zmax) for z index in use
 
     cine_img = None
     cine_mask = None
@@ -48,11 +122,11 @@ class MainFrame(QtGui.QWidget):
     # ClickerClass connected with given axis
     cc = None
 
-    valueChanged = QtCore.pyqtSignal(int)
 
     def __init__(self, master=None):
 
         super(MainFrame, self).__init__()
+        QtCore.pyqtSignal(int)
 
         self.grid = QtGui.QGridLayout()
 
@@ -67,10 +141,9 @@ class MainFrame(QtGui.QWidget):
         self.canvas2.setParent(self)
 
         # connect axis activities
-        self.cc = ClickerClass(self.ax1, self.ax2, self.canvas1, self.canvas2)
+        self.cc = ClickerClass(self)
 
         # gui setup
-        self.set_button()
         self.set_title()
         self.set_slider()
         self.set_spinbox()
@@ -81,25 +154,15 @@ class MainFrame(QtGui.QWidget):
         self.setLayout(self.grid)
 
 
-    def set_button(self):
-        self.btn["load"] = QtGui.QPushButton("Load Subject Directory")
-        self.btn["save"] = QtGui.QPushButton("Save")
-        self.btn["endo1"] = QtGui.QPushButton("Multiple")
-        self.btn["endo2"] = QtGui.QPushButton("Singular")
-        self.btn["epic1"] = QtGui.QPushButton("Multiple")
-        self.btn["epic2"] = QtGui.QPushButton("Singular")
-
-
     def set_title(self):
-        self.setWindowTitle("Border Detection")
 
-        self.title["endo"] = QtGui.QLabel("Endocardial detection: ")
-        self.title["endo"].setStyleSheet("font: bold")
-        self.title["endo"].setAlignment(QtCore.Qt.AlignCenter)
+        self.title["cineimg"] = QtGui.QLabel("Cine image")
+        self.title["cineimg"].setStyleSheet("font: bold")
+        self.title["cineimg"].setAlignment(QtCore.Qt.AlignCenter)
 
-        self.title["epic"] = QtGui.QLabel("Epicardial  detection: ")
-        self.title["epic"].setStyleSheet("font: bold")
-        self.title["epic"].setAlignment(QtCore.Qt.AlignCenter)
+        self.title["maskimg"] = QtGui.QLabel("Binary mask")
+        self.title["maskimg"].setStyleSheet("font: bold")
+        self.title["maskimg"].setAlignment(QtCore.Qt.AlignCenter)
 
         self.title["tslice"] = QtGui.QLabel("Time slice [0, 30): ")
         self.title["tslice"].setStyleSheet("font: bold")
@@ -179,14 +242,6 @@ class MainFrame(QtGui.QWidget):
 
 
     def connect_activity(self):
-        # connect buttons
-        self.btn["load"].clicked.connect(self.load_directory)
-        self.btn["save"].clicked.connect(self.save_img)
-        self.btn["endo1"].clicked.connect(self.multiple_endocardial_detection)
-        self.btn["endo2"].clicked.connect(self.singular_endocardial_detection)
-        self.btn["epic1"].clicked.connect(self.multiple_epicardial_detection)
-        self.btn["epic2"].clicked.connect(self.singular_epicardial_detection)
-
         # connect spinboxes
         self.spinbox["tidx"].valueChanged.connect(self.slider["tidx"].setValue)
         self.spinbox["zidx"].valueChanged.connect(self.slider["zidx"].setValue)
@@ -204,17 +259,10 @@ class MainFrame(QtGui.QWidget):
 
 
     def add_widget(self):
-        # add buttons
-        self.grid.addWidget(self.btn["load"], 0, 0)
-        self.grid.addWidget(self.btn["save"], 1, 0)
-        self.grid.addWidget(self.btn["endo1"], 0, 2)
-        self.grid.addWidget(self.btn["endo2"], 0, 3)
-        self.grid.addWidget(self.btn["epic1"], 1, 2)
-        self.grid.addWidget(self.btn["epic2"], 1, 3)
 
-        # add titles
-        self.grid.addWidget(self.title["endo"], 0, 1)
-        self.grid.addWidget(self.title["epic"], 1, 1)
+        self.grid.addWidget(self.title["cineimg"], 0, 0, 2, 2)
+        self.grid.addWidget(self.title["maskimg"], 0, 2, 2, 2)
+
         self.grid.addWidget(self.title["tslice"], 7, 0)
         self.grid.addWidget(self.title["zslice"], 8, 0)
         self.grid.addWidget(self.title["tmin"], 9, 0)
@@ -240,34 +288,34 @@ class MainFrame(QtGui.QWidget):
 
 
     def reset_setting(self):
-        self._tslicenum = self.cine_img.shape[2]
-        self._zslicenum = self.cine_img.shape[3]
+        self.tslicenum = self.cine_img.shape[2]
+        self.zslicenum = self.cine_img.shape[3]
 
-        self._tidx, self._zidx = 0, 0
-        self._tmin, self._zmin = 0, 0
-        self._tmax = self._tslicenum-1
-        self._zmax = self._zslicenum-1
+        self.tidx, self.zidx = 0, 0
+        self.tmin, self.zmin = 0, 0
+        self.tmax = self.tslicenum-1
+        self.zmax = self.zslicenum-1
 
-        self.slider["tidx"].setRange(self._tmin, self._tmax)
-        self.slider["zidx"].setRange(self._zmin, self._zmax)
-        self.spinbox["tidx"].setRange(self._tmin, self._tmax)
-        self.spinbox["zidx"].setRange(self._zmin, self._zmax)
+        self.slider["tidx"].setRange(self.tmin, self.tmax)
+        self.slider["zidx"].setRange(self.zmin, self.zmax)
+        self.spinbox["tidx"].setRange(self.tmin, self.tmax)
+        self.spinbox["zidx"].setRange(self.zmin, self.zmax)
 
-        self.spinbox["tmin"].setRange(0, self._tmax-1)
-        self.spinbox["zmin"].setRange(0, self._zmax-1)
-        self.spinbox["tmax"].setRange(self._tmin+1, self._tslicenum-1)
-        self.spinbox["zmax"].setRange(self._zmin+1, self._zslicenum-1)
+        self.spinbox["tmin"].setRange(0, self.tmax-1)
+        self.spinbox["zmin"].setRange(0, self.zmax-1)
+        self.spinbox["tmax"].setRange(self.tmin+1, self.tslicenum-1)
+        self.spinbox["zmax"].setRange(self.zmin+1, self.zslicenum-1)
 
-        self.slider["tidx"].setValue(self._tidx)
-        self.slider["zidx"].setValue(self._zidx)
+        self.slider["tidx"].setValue(self.tidx)
+        self.slider["zidx"].setValue(self.zidx)
 
-        self.spinbox["tidx"].setValue(self._tidx)
-        self.spinbox["zidx"].setValue(self._zidx)
+        self.spinbox["tidx"].setValue(self.tidx)
+        self.spinbox["zidx"].setValue(self.zidx)
 
         self.spinbox["tmin"].setValue(0)
         self.spinbox["zmin"].setValue(0)
-        self.spinbox["tmax"].setValue(self._tmax)
-        self.spinbox["zmax"].setValue(self._zmax)
+        self.spinbox["tmax"].setValue(self.tmax)
+        self.spinbox["zmax"].setValue(self.zmax)
 
         # update slider titles to fit current slicenums
         self.grid.removeWidget(self.title["tslice"])
@@ -278,11 +326,11 @@ class MainFrame(QtGui.QWidget):
         del self.title["zslice"]
 
         # set new titles
-        self.title["tslice"] = QtGui.QLabel("Time slice [0, {}): ".format(self._tslicenum))
+        self.title["tslice"] = QtGui.QLabel("Time slice [0, {}): ".format(self.tslicenum))
         self.title["tslice"].setStyleSheet("font: bold")
         self.title["tslice"].setAlignment(QtCore.Qt.AlignCenter)
 
-        self.title["zslice"] = QtGui.QLabel("Z slice [0, {}): ".format(self._zslicenum))
+        self.title["zslice"] = QtGui.QLabel("Z slice [0, {}): ".format(self.zslicenum))
         self.title["zslice"].setStyleSheet("font: bold")
         self.title["zslice"].setAlignment(QtCore.Qt.AlignCenter)
 
@@ -292,80 +340,88 @@ class MainFrame(QtGui.QWidget):
 
         # update cc settings
         self.cc.reset_setting()
-        self.cc.init_mask(self.cine_mask)
-        self.cc.init_img(self.cine_img)
-        self.cc.init_vertex()
-        self.cc.update_tlimit(self._tmin, self._tmax)
-        self.cc.update_zlimit(self._zmin, self._zmax)
 
-        # self.canvas1.draw()
-        # self.canvas2.draw()
+
+    def update_image_title(self, title):
+        # update slider titles to fit current slicenums
+        self.grid.removeWidget(self.title["cineimg"])
+        self.title["cineimg"].deleteLater()
+        del self.title["cineimg"]
+
+        # set new titles
+        self.title["cineimg"] = QtGui.QLabel(title)
+        self.title["cineimg"].setStyleSheet("font: bold")
+        self.title["cineimg"].setAlignment(QtCore.Qt.AlignCenter)
+
+        # add title widgets
+        self.grid.addWidget(self.title["cineimg"], 0, 0, 2, 2)
+
 
     def update_tidx(self, value):
-        if self._loadflag == True:
-            self._tidx = value
+        if self.loadflag == True:
+            self.tidx = value
             self.update_slice()
 
-            self.cc.update_index(self._tidx, self._zidx)
+            self.cc.update_index(self.tidx, self.zidx)
             self.redraw_img()
 
 
     def update_zidx(self, value):
-        if self._loadflag == True:
-            self._zidx = value
+        if self.loadflag == True:
+            self.zidx = value
             self.update_slice()
 
-            self.cc.update_index(self._tidx, self._zidx)
+            self.cc.update_index(self.tidx, self.zidx)
             self.redraw_img()
 
 
     def update_tmin(self, value):
-        self._tmin = value
+        self.tmin = value
         self.spinbox["tmin"].setValue(value)
-        self.spinbox["tmin"].setRange(0, self._tmax-1)
+        self.spinbox["tmin"].setRange(0, self.tmax-1)
 
-        self.slider["tidx"].setRange(self._tmin, self._tmax)
-        self.spinbox["tidx"].setRange(self._tmin, self._tmax)
+        self.slider["tidx"].setRange(self.tmin, self.tmax)
+        self.spinbox["tidx"].setRange(self.tmin, self.tmax)
 
-        self.cc.update_tlimit(self._tmin, self._tmax)
+        self.cc.update_tlimit(self.tmin, self.tmax)
 
 
     def update_tmax(self, value):
-        self._tmax = value
+        self.tmax = value
         self.spinbox["tmax"].setValue(value)
-        self.spinbox["tmax"].setRange(self._tmin+1, self._tslicenum-1)
+        self.spinbox["tmax"].setRange(self.tmin+1, self.tslicenum-1)
 
-        self.slider["tidx"].setRange(self._tmin, self._tmax)
-        self.spinbox["tidx"].setRange(self._tmin, self._tmax)
+        self.slider["tidx"].setRange(self.tmin, self.tmax)
+        self.spinbox["tidx"].setRange(self.tmin, self.tmax)
 
-        self.cc.update_tlimit(self._tmin, self._tmax)
+        self.cc.update_tlimit(self.tmin, self.tmax)
 
 
     def update_zmin(self, value):
-        self._zmin = value
+        self.zmin = value
         self.spinbox["zmin"].setValue(value)
-        self.spinbox["zmin"].setRange(0, self._zmax-1)
+        self.spinbox["zmin"].setRange(0, self.zmax-1)
 
-        self.slider["zidx"].setRange(self._zmin, self._zmax)
-        self.spinbox["zidx"].setRange(self._zmin, self._zmax)
+        self.slider["zidx"].setRange(self.zmin, self.zmax)
+        self.spinbox["zidx"].setRange(self.zmin, self.zmax)
 
-        self.cc.update_zlimit(self._zmin, self._zmax)
+        self.cc.update_zlimit(self.zmin, self.zmax)
 
 
     def update_zmax(self, value):
-        self._zmax = value
+        self.zmax = value
         self.spinbox["zmax"].setValue(value)
-        self.spinbox["zmax"].setRange(self._zmin+1, self._zslicenum-1)
+        self.spinbox["zmax"].setRange(self.zmin+1, self.zslicenum-1)
 
-        self.slider["zidx"].setRange(self._zmin, self._zmax)
-        self.spinbox["zidx"].setRange(self._zmin, self._zmax)
+        self.slider["zidx"].setRange(self.zmin, self.zmax)
+        self.spinbox["zidx"].setRange(self.zmin, self.zmax)
 
-        self.cc.update_zlimit(self._zmin, self._zmax)
+        self.cc.update_zlimit(self.zmin, self.zmax)
 
 
     def update_slice(self):
-        self.img_slice = self.cine_img[:, :, self._tidx, self._zidx]
-        self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
+        self.img_slice = self.cine_img[:, :, self.tidx, self.zidx]
+        self.mask_slice = self.cine_mask[:, :, self.tidx, self.zidx]
 
 
     def load_directory(self):
@@ -393,7 +449,7 @@ class MainFrame(QtGui.QWidget):
             return
 
         self.cine_img = temp
-        self._loadflag = True
+        self.loadflag = True
         self.cine_img = algorithm.resize(self.cine_img, mode=256)
 
         self.img_slice = self.cine_img[:, :, 0, 0]
@@ -428,7 +484,7 @@ class MainFrame(QtGui.QWidget):
 
 
     def singular_endocardial_detection(self):
-        if self._loadflag == False:
+        if self.loadflag == False:
             return
 
         print("\nInitializing singular endocardial detection..... ", end="")
@@ -438,7 +494,7 @@ class MainFrame(QtGui.QWidget):
 
 
     def multiple_endocardial_detection(self):
-        if self._loadflag == False:
+        if self.loadflag == False:
             return
 
         print("\nInitializing multiple endocardial detection..... ", end="")
@@ -448,7 +504,7 @@ class MainFrame(QtGui.QWidget):
 
 
     def singular_epicardial_detection(self):
-        if self._loadflag == False:
+        if self.loadflag == False:
             return
 
         self.cc.set_singular()
@@ -456,7 +512,7 @@ class MainFrame(QtGui.QWidget):
 
 
     def multiple_epicardial_detection(self):
-        if self._loadflag == False:
+        if self.loadflag == False:
             return
 
         self.cc.set_multiple()
@@ -469,7 +525,7 @@ class ClickerClass(object):
               "connect": "'i': insert, 't': toggle vertex, 'RIGHT': delete\n"
                      "Press 'Enter' to crop, 'm' to switch modes",
               "seed": "LEFT: select seed\n"
-                      "Press 'enter' to complete",
+                      "Press 'Enter' to complete",
               "mask": "Binary mask\n",
               "init": "Cine image\n"}
 
@@ -477,15 +533,16 @@ class ClickerClass(object):
     _tmin, _tmax = 0, 100 # index range [_tmin, _tmax] for detection
     _zmin, _zmax = 0, 100 # index range [_zmin, _zmax] for detection
 
-    _detectionflag = None
     _loadflag = False
+    _detectionflag = None
     _showverts = True
     _epsilon = 5 # cursor sensitivity in pixels
     _modes = "init"
     # True: Place landmarks, False: Connect landmarks
     _alpha = 0.30
     _ind = None # active vertex
-    _seed = [] # seed point for endocardial detection
+    _seed = None # seed point for endocardial detection
+    _tseed = [] # temporary seed container
 
     _cid = []
 
@@ -503,25 +560,25 @@ class ClickerClass(object):
     background = None
 
 
-    def __init__(self, ax1, ax2, canvas1, canvas2):
+    def __init__(self, Window):
+
+        self.Window = Window
+
         # get axis object
-        self.ax1 = ax1
-        self.ax2 = ax2
+        self.ax1 = Window.ax1
+        self.ax2 = Window.ax2
 
         # get figure object
-        self.fig1 = ax1.get_figure()
-        self.fig2 = ax2.get_figure()
+        self.fig1 = Window.fig1
+        self.fig2 = Window.fig2
 
         # get canvas object
-        self.canvas1 = canvas1
-        self.canvas2 = canvas2
+        self.canvas1 = Window.canvas1
+        self.canvas2 = Window.canvas2
 
         # quick solution for inactive key_press_event
         self.canvas1.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.canvas1.setFocus()
-
-        self.ax1.set_title(self._title["init"])
-        self.ax2.set_title(self._title["mask"])
 
         # initiate artist objects
         self.plot = self.ax1.plot([], [], marker='o', markerfacecolor='b',
@@ -546,13 +603,17 @@ class ClickerClass(object):
         self.position = [[[] for i in range(zl)] for j in range(tl)]
         self.verts = self.position[self._tidx][self._zidx]
 
+        # access: _seed[tl][zl]
+        self._seed = [[[] for i in range(zl)] for j in range(tl)]
 
-    def init_img(self, img):
-        self.cine_img = img
+
+    def init_img(self):
+        self.cine_img = self.Window.cine_img
+        self._loadflag = True
 
 
-    def init_mask(self, mask):
-        self.cine_mask = mask
+    def init_mask(self):
+        self.cine_mask = self.Window.cine_mask
         self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
         self.cropped = np.zeros((self.cine_mask.shape[2], self.cine_mask.shape[3]))
 
@@ -560,16 +621,21 @@ class ClickerClass(object):
     def reset_setting(self):
         self._showverts = True
         self._modes = "plot"
-        self.ax1.set_title(self._title[self._modes])
+        self.Window.update_image_title(self._title[self._modes])
 
         self.cine_mask = None
         self.mask_slice = None
-        self._seed = []
-        self._tidx, self._zidx = 0, 0
-        self._tmin, self._zmax = 0, 100
-        self._tmin, self._zmax = 0, 100
+
+        self._tidx, self._zidx = self.Window.tidx, self.Window.zidx
+        self._tmin, self._tmax = self.Window.tmin, self.Window.tmax
+        self._zmin, self._zmax = self.Window.zmin, self.Window.zmax
+
         self._loadflag = True
         self._detectionflag = None
+
+        self.init_mask()
+        self.init_img()
+        self.init_vertex()
 
 
     def update_index(self, tidx, zidx):
@@ -597,7 +663,10 @@ class ClickerClass(object):
 
     def replot(self):
         if self._modes == "seed":
-            verts = self._seed[:]
+            if(len(self._tseed) == 1):
+                verts = self._tseed
+            else:
+                verts = self._seed[self._tidx][self._zidx]
         else:
             verts = self.verts[:]
 
@@ -643,11 +712,13 @@ class ClickerClass(object):
 
     def switch2seed(self):
         self._modes = "seed"
-        self.ax1.set_title(self._title["seed"])
-        self.ax1.set_ylabel("")
+        self.Window.update_image_title(self._title[self._modes])
+
+        # access: _seed[tl][zl]
+        # self._seed = [[[] for i in range(zl)] for j in range(tl)]
+        self._tseed.clear()
 
         # clears the existing plot
-        # self.verts.clear()
         self.replot()
         if self.poly:
             self.poly.xy = [(0, 0)]
@@ -657,8 +728,7 @@ class ClickerClass(object):
 
     def switch2plot(self):
         self._modes = "plot"
-        self.ax1.set_title(self._title["plot"])
-        self.ax1.set_ylabel("")
+        self.Window.update_image_title(self._title[self._modes])
 
         self.replot()
         if self.poly:
@@ -670,8 +740,7 @@ class ClickerClass(object):
             return
 
         self._modes = "connect"
-        self.ax1.set_title(self._title["connect"])
-        self.ax1.set_ylabel("Alpha: %.2f" %self._alpha)
+        self.Window.update_image_title(self._title[self._modes])
 
         self.poly.xy = np.array(self.verts[:])
         self.line.set_data(zip(*self.poly.xy))
@@ -723,10 +792,7 @@ class ClickerClass(object):
             if self._alpha <= 0.00:
                 self._alpha = 0.00
 
-        #print("alpha changed")
-        self.ax1.set_ylabel("Alpha: %.2f" % self._alpha)
         self.poly.set_alpha(self._alpha)
-        # self.ax1.draw_artist(self.ax1.yaxis)
         self.canvas1.draw()
 
 
@@ -738,7 +804,6 @@ class ClickerClass(object):
         if not self._loadflag: return
         if event.button != 1: return
         if not event.inaxes: return
-
 
         self.move_vertex_to(event)
         self.canvas1.restore_region(self.background)
@@ -758,10 +823,7 @@ class ClickerClass(object):
         if not self._loadflag: return
         if not event.inaxes: return
 
-        # print("key_press active")
-
         if event.key == 't':
-            # self.switch_vis()
             pass
         elif event.key == 'm':
             self.switch_modes()
@@ -785,7 +847,6 @@ class ClickerClass(object):
         for x in range(self.cine_mask.shape[1]):
             for y in range(self.cine_mask.shape[0]):
                 if self.poly.get_path().contains_point((x,y)):
-                    #self.covered_pixels.append((x,y))
                     self.mask_slice[y][x] = 1
                 else:
                     self.mask_slice[y][x] = 0
@@ -807,7 +868,8 @@ class ClickerClass(object):
             return
 
         if self._modes == "seed":
-            verts = self._seed
+            # verts = self._seed[self._tidx][self._zidx]
+            verts = self._tseed
             verts.clear()
         else:
             verts = self.verts
@@ -879,17 +941,32 @@ class ClickerClass(object):
             return
 
         img_slice = self.cine_img[:, :, self._tidx, self._zidx]
-        if len(self._seed) == 0:
+        #if len(self._seed[self._tidx][self._zidx]) == 0:
+        #    return
+
+        if len(self._tseed) == 0:
             return
 
         print("complete")
-        print("seed set at", (int(self._seed[0][0]),\
-                              int(self._seed[0][1])))
+        # print("seed set at", ((self._seed[self._tidx][self._zidx][0][0]),\
+        #                      (self._seed[self._tidx][self._zidx][0][1])))
+
+        print("seed set at", (self._tseed[0][0], \
+                              self._tseed[0][1]))
+
         print("segmenting mask..... ", end="")
 
+        """
         self.mask_slice[:, :] = \
             algorithm.endocardial_detection(img_slice,
-            (int(self._seed[0][0]), int(self._seed[0][1])))[:, :]
+            (int(self._seed[self._tidx][self._zidx][0][0]), \
+             int(self._seed[self._tidx][self._zidx][0][1])))[:, :]
+        """
+
+        self.mask_slice[:, :] = \
+                algorithm.endocardial_detection(img_slice, \
+                (self._tseed[0][0], self._tseed[0][1]))[:, :]
+
 
         # if valid mask
         if int(np.sum(self.mask_slice)) != 0:
@@ -905,6 +982,11 @@ class ClickerClass(object):
 
             print("complete")
 
+            self._seed[self._tidx][self._zidx].clear()
+            self._seed[self._tidx][self._zidx].append(\
+                      (self._tseed[0][0], self._tseed[0][1]))
+            print("Seed updated")
+
             self.switch2poly()
             self.poly2mask()
         else:
@@ -912,7 +994,7 @@ class ClickerClass(object):
             self.switch2plot()
             self.cropped[self._tidx][self._zidx] = False
 
-        self._seed = []
+        # self._seed = []
         self.canvas1.draw()
 
 
@@ -920,27 +1002,28 @@ class ClickerClass(object):
         if not self._modes == "seed":
             return
 
-        if len(self._seed) == 0:
+        if len(self._seed[self._tidx][self._zidx]) == 0:
             return
 
         print("complete")
-        print("seed set at", (int(self._seed[0][0]),\
-                              int(self._seed[0][1])))
+        print("seed set at", (int(self._seed[self._tidx][self._zidx][0][0]),\
+                              int(self._seed[self._tidx][self._zidx][0][1])))
 
         print("segmenting mask ", end="")
-        # mod = int(((self._tmin+self._tmax)/5)+0.5)
-        for t in range(self._tmin, self._tmax+1):
 
-            # status bar
-            # if mod != 0 && t%mod == 0:
-            #    print(".", end="", flush=True)
+        # seed = self._seed[self._tidx][self._zidx][0][0]
+        # visited, queue = set(),
+
+        for t in range(self._tmin, self._tmax+1):
 
             for z in range(self._zmin, self._zmax+1):
                 img_slice = self.cine_img[:, :, t, z]
                 self.mask_slice = self.cine_mask[:, :, t, z]
+
                 self.mask_slice[:, :] = \
                                algorithm.endocardial_detection(img_slice,
-                               (int(self._seed[0][0]), int(self._seed[0][1])))[:, :]
+                               (int(self._seed[self._tidx][self._zidx][0][0]), \
+                                int(self._seed[self._tidx][self._zidx][0][1])))[:, :]
 
                 if int(np.sum(self.mask_slice)) != 0:
                    self.cropped[t][z] = True
@@ -950,13 +1033,13 @@ class ClickerClass(object):
         print("complete")
 
         print("calculating hull", end="")
-        for t in range(self._tmin, self._tmax+1):
+        for t in range(self._tmin, self._tmax):
 
             # status bar
             #if t%(mod) == 0:
             #    print(".", end="", flush=True)
 
-            for z in range(self._zmin, self._zmax+1):
+            for z in range(self._zmin, self._zmax):
 
                 if self.cropped[t][z] == False:
                     continue
@@ -980,7 +1063,7 @@ class ClickerClass(object):
         self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
 
         self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
-        self._seed = []
+        # self._seed = []
 
         if len(self.verts) <= 2:
             self.switch2plot()
@@ -989,6 +1072,14 @@ class ClickerClass(object):
 
         self.canvas1.draw()
         self.canvas2.draw()
+
+
+    def singular_epicardial_detection(self):
+        pass
+
+
+    def multiple_epicardial_detection(self):
+        pass
 
 
     def set_singular(self):
