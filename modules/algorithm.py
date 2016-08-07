@@ -51,7 +51,11 @@ def convex_hull(binary_mask):
             if binary_mask[x][y] > 0.:
                 points.append([y, x])
 
+    if len(points) < 3:
+        return points
+
     hull = ConvexHull(points)
+
 
     position = []
     for idx in hull.vertices:
