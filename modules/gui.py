@@ -357,6 +357,20 @@ class MainFrame(QtGui.QWidget):
         self.grid.addWidget(self.title["cineimg"], 0, 0, 2, 2)
 
 
+    def update_mask_title(self, title):
+        self.grid.removeWidget(self.title["maskimg"])
+        self.title["maskimg"].deleteLater()
+        del self.title["maskimg"]
+
+        # set new titles
+        self.title["maskimg"] = QtGui.QLabel(title)
+        self.title["maskimg"].setStyleSheet("font: bold")
+        self.title["maskimg"].setAlignment(QtCore.Qt.AlignCenter)
+
+        # add title widgets
+        self.grid.addWidget(self.title["maskimg"], 0, 2, 2, 2)
+
+
     def update_tidx(self, value):
         if self.loadflag == True:
             self.tidx = value
@@ -535,7 +549,6 @@ class ClickerClass(object):
 
     _loadflag = False
     _detectionflag = None
-    _showverts = True
     _epsilon = 5 # cursor sensitivity in pixels
     _modes = "init"
     # True: Place landmarks, False: Connect landmarks
@@ -619,7 +632,6 @@ class ClickerClass(object):
 
 
     def reset_setting(self):
-        self._showverts = True
         self._modes = "plot"
         self.Window.update_image_title(self._title[self._modes])
 
@@ -701,7 +713,6 @@ class ClickerClass(object):
 
     def switch_modes(self):
         if not self._loadflag: return
-        if not self._showverts: return
         if self._modes == "seed": return
 
         if self._modes == "plot":
@@ -757,7 +768,6 @@ class ClickerClass(object):
 
 
     def button_press_callback(self, event):
-        if not self._showverts: return
         if not event.inaxes: return
         if not self._loadflag: return
 
@@ -774,14 +784,12 @@ class ClickerClass(object):
 
     def button_release_callback(self, event):
         if not self._loadflag: return
-        if not self._showverts: return
 
         self._ind = None
 
 
     def scroll_callback(self, event):
         if not self._loadflag: return
-        if not self._showverts: return
         if not self._modes == "connect": return
 
         if event.button == 'up':
@@ -799,7 +807,6 @@ class ClickerClass(object):
     def motion_notify_callback(self, event):
         # on mouse movement
         if self._ind is None: return
-        if not self._showverts: return
         if self._modes == "seed": return
         if not self._loadflag: return
         if event.button != 1: return
@@ -878,7 +885,6 @@ class ClickerClass(object):
 
     def insert_vertex(self, event):
         if not self._modes == "connect": return
-        if not self._showverts: return
         if not self._loadflag: return
 
         p = event.xdata, event.ydata  # display coords
@@ -940,33 +946,20 @@ class ClickerClass(object):
         if not self._modes == "seed":
             return
 
-        img_slice = self.cine_img[:, :, self._tidx, self._zidx]
-        #if len(self._seed[self._tidx][self._zidx]) == 0:
-        #    return
+        #img_slice = self.cine_img[:, :, self._tidx, self._zidx]
 
         if len(self._tseed) == 0:
             return
 
-        print("complete")
-        # print("seed set at", ((self._seed[self._tidx][self._zidx][0][0]),\
-        #                      (self._seed[self._tidx][self._zidx][0][1])))
-
-        print("seed set at", (self._tseed[0][0], \
-                              self._tseed[0][1]))
-
-        print("segmenting mask..... ", end="")
-
-        """
-        self.mask_slice[:, :] = \
-            algorithm.endocardial_detection(img_slice,
-            (int(self._seed[self._tidx][self._zidx][0][0]), \
-             int(self._seed[self._tidx][self._zidx][0][1])))[:, :]
-        """
+        print("complete",
+              "\nseed set at", (self._tseed[0][0], \
+                              self._tseed[0][1]),
+              "\nsegmenting mask..... ", end="")
 
         self.mask_slice[:, :] = \
-                algorithm.endocardial_detection(img_slice, \
-                (self._tseed[0][0], self._tseed[0][1]))[:, :]
-
+                    algorithm.endocardial_detection(
+                    self.cine_img[:, :, self._tidx, self._zidx], \
+                    (self._tseed[0][0], self._tseed[0][1]))[:, :]
 
         # if valid mask
         if int(np.sum(self.mask_slice)) != 0:
@@ -1002,31 +995,34 @@ class ClickerClass(object):
         if not self._modes == "seed":
             return
 
-        if len(self._seed[self._tidx][self._zidx]) == 0:
+        if len(self._tseed) == 0:
             return
 
-        print("complete")
-        print("seed set at", (int(self._seed[self._tidx][self._zidx][0][0]),\
-                              int(self._seed[self._tidx][self._zidx][0][1])))
+        print("complete",
+              "\nseed set at", (self._tseed[0][0], \
+                                self._tseed[0][1]),
+              "\nsegmenting mask..... ", end="")
 
-        print("segmenting mask ", end="")
 
         # seed = self._seed[self._tidx][self._zidx][0][0]
         # visited, queue = set(),
 
-        for t in range(self._tmin, self._tmax+1):
+        for t in range(self._tmin, self._tmax):
 
-            for z in range(self._zmin, self._zmax+1):
-                img_slice = self.cine_img[:, :, t, z]
+            for z in range(self._zmin, self._zmax):
+                #img_slice = self.cine_img[:, :, t, z]
                 self.mask_slice = self.cine_mask[:, :, t, z]
 
                 self.mask_slice[:, :] = \
-                               algorithm.endocardial_detection(img_slice,
-                               (int(self._seed[self._tidx][self._zidx][0][0]), \
-                                int(self._seed[self._tidx][self._zidx][0][1])))[:, :]
+                            algorithm.endocardial_detection(
+                            self.cine_img[:, :, t, z], \
+                            (self._tseed[0][0], self._tseed[0][1]))[:, :]
 
                 if int(np.sum(self.mask_slice)) != 0:
-                   self.cropped[t][z] = True
+                    self._seed[t][z].clear()
+                    self._seed[t][z].append(\
+                              (self._tseed[0][0], self._tseed[0][1]))
+                    self.cropped[t][z] = True
                 else:
                     self.cropped[t][z] = False
 
@@ -1035,22 +1031,28 @@ class ClickerClass(object):
         print("calculating hull", end="")
         for t in range(self._tmin, self._tmax):
 
-            # status bar
-            #if t%(mod) == 0:
-            #    print(".", end="", flush=True)
-
             for z in range(self._zmin, self._zmax):
 
-                if self.cropped[t][z] == False:
+                if self.cropped[t][z] != True:
                     continue
                 self.mask_slice = self.cine_mask[:, :, t, z]
-                # self.verts = self.position[t][z]
 
                 self.position[t][z] = algorithm.convex_hull(self.mask_slice)
-
                 self.poly.xy = np.array(self.position[t][z])
-                for x in range(self.mask_slice.shape[1]):
-                    for y in range(self.mask_slice.shape[0]):
+
+                # sub-window vertices, reduced search space
+                xcenter = self._seed[t][z][0][1]
+                ycenter = self._seed[t][z][0][0]
+                xllim, xulim = xcenter-50, xcenter+50
+                yllim, yulim = ycenter-50, ycenter+50
+
+                if xllim > 0: xllim = 0
+                if xulim > self.mask_slice.shape[1]: xulim = self.mask_slice.shape[1]
+                if yllim > 0: yllim = 0
+                if yulim > self.mask_slice.shape[0]: yulim = self.mask_slice.shape[0]
+
+                for x in range(xllim, xulim):
+                    for y in range(yllim, yulim):
                         if self.poly.get_path().contains_point((x,y)):
                             self.mask_slice[y][x] = 1
                         else:
