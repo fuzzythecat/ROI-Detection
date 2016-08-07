@@ -1,8 +1,9 @@
 import os
 import numpy as np
+import pprint
+
 from matplotlib import use
 use("Qt4Agg")
-
 from matplotlib.lines import Line2D
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
@@ -945,9 +946,6 @@ class ClickerClass(object):
     def singular_endocardial_detection(self):
         if not self._modes == "seed":
             return
-
-        #img_slice = self.cine_img[:, :, self._tidx, self._zidx]
-
         if len(self._tseed) == 0:
             return
 
@@ -994,7 +992,6 @@ class ClickerClass(object):
     def multiple_endocardial_detection(self):
         if not self._modes == "seed":
             return
-
         if len(self._tseed) == 0:
             return
 
@@ -1003,53 +1000,84 @@ class ClickerClass(object):
                                 self._tseed[0][1]),
               "\nsegmenting mask..... ", end="")
 
-
-        # seed = self._seed[self._tidx][self._zidx][0][0]
-        # visited, queue = set(),
+        queue = []
+        epsilon = 15 #Manhattan distance
+        dirx = [3,3,3,-3,-3,-3,0,0]
+        diry = [0,3,-3,0,3,-3,3,-3]
+        tot_cnt = 0
+        success_cnt = 0
+        failed_index = []
 
         for t in range(self._tmin, self._tmax):
 
             for z in range(self._zmin, self._zmax):
-                #img_slice = self.cine_img[:, :, t, z]
-                self.mask_slice = self.cine_mask[:, :, t, z]
+                flag = False
+                tot_cnt += 1
 
-                self.mask_slice[:, :] = \
+                xseed, yseed = self._tseed[0][0], self._tseed[0][1]
+                self.mask_slice = self.cine_mask[:, :, t, z]
+                visited = np.zeros((self.cine_mask.shape[0],\
+                                    self.cine_mask.shape[1]))
+                queue.append((self._tseed[0][0], self._tseed[0][1]))
+
+                while queue:
+                    center = queue.pop(0)
+
+                    if not visited[center[0]][center[1]]:
+                        visited[center[0]][center[1]] = True
+
+                        self.mask_slice[:, :] = \
                             algorithm.endocardial_detection(
                             self.cine_img[:, :, t, z], \
-                            (self._tseed[0][0], self._tseed[0][1]))[:, :]
+                            (center[0], center[1]))[:, :]
 
-                if int(np.sum(self.mask_slice)) != 0:
-                    self._seed[t][z].clear()
-                    self._seed[t][z].append(\
-                              (self._tseed[0][0], self._tseed[0][1]))
-                    self.cropped[t][z] = True
-                else:
-                    self.cropped[t][z] = False
+                        if int(np.sum(self.mask_slice)) != 0:
+                            success_cnt += 1
+                            flag = True
+                            self._seed[t][z].clear()
+                            self._seed[t][z].append((center[0], center[1]))
+                            self._tseed.clear()
+                            self._tseed.append((center[0],center[1]))
+                            self.cropped[t][z] = True
+                            del visited
+                            queue.clear()
+                            break;
 
+                        for i in range(8):
+                            if ((abs(center[0]+dirx[i]-self._tseed[0][0])+\
+                                 abs(center[1]+diry[i]-self._tseed[0][1]))<epsilon):
+                                queue.append(((center[0]+dirx[i]),(center[1]+diry[i])))
+                if(not flag):
+                    failed_index.append((z, t))
+
+        queue.clear()
         print("complete")
-
-        print("calculating hull", end="")
+        print("calculating hull.....", end="")
         for t in range(self._tmin, self._tmax):
 
             for z in range(self._zmin, self._zmax):
-
                 if self.cropped[t][z] != True:
                     continue
                 self.mask_slice = self.cine_mask[:, :, t, z]
 
-                self.position[t][z] = algorithm.convex_hull(self.mask_slice)
+                try:
+                    self.position[t][z] = algorithm.convex_hull(self.mask_slice)
+                except:
+                    print("failed on ({}, {})".format(t, z))
+                    continue
+
                 self.poly.xy = np.array(self.position[t][z])
 
                 # sub-window vertices, reduced search space
-                xcenter = self._seed[t][z][0][1]
-                ycenter = self._seed[t][z][0][0]
+                xcenter = self._seed[t][z][0][0]
+                ycenter = self._seed[t][z][0][1]
                 xllim, xulim = xcenter-50, xcenter+50
                 yllim, yulim = ycenter-50, ycenter+50
 
-                if xllim > 0: xllim = 0
-                if xulim > self.mask_slice.shape[1]: xulim = self.mask_slice.shape[1]
-                if yllim > 0: yllim = 0
-                if yulim > self.mask_slice.shape[0]: yulim = self.mask_slice.shape[0]
+                if xllim < 0: xllim = 0
+                if xulim > self.mask_slice.shape[0]: xulim = self.mask_slice.shape[0]
+                if yllim < 0: yllim = 0
+                if yulim > self.mask_slice.shape[1]: yulim = self.mask_slice.shape[1]
 
                 for x in range(xllim, xulim):
                     for y in range(yllim, yulim):
@@ -1059,13 +1087,18 @@ class ClickerClass(object):
                             self.mask_slice[y][x] = 0
 
         print(" complete")
-        # print("")
+        print("Successfully segmented {} slices out of {}".format(success_cnt, tot_cnt))
+        if(success_cnt != tot_cnt):
+            #pp = pprint.PrettyPrinter(indent=4)
+            #pp.pprint(failed_index)
+            print("failed on: ")
+            print(failed_index)
+        del failed_index
 
         self.verts = self.position[self._tidx][self._zidx]
         self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
 
         self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
-        # self._seed = []
 
         if len(self.verts) <= 2:
             self.switch2plot()
