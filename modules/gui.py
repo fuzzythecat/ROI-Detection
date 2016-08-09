@@ -50,12 +50,15 @@ class MainWindow(QtGui.QMainWindow):
 
         showEndocardium = QtGui.QAction("Endocardium", self)
         showEndocardium.setStatusTip("Show endocardial binary mask")
+        showEndocardium.triggered.connect(self.fig.show_endocardium)
 
         showEpicardium = QtGui.QAction("Epicardium", self)
         showEpicardium.setStatusTip("Show epicardial binary mask")
+        showEpicardium.triggered.connect(self.fig.show_epicardium)
 
         showMyocardium = QtGui.QAction("Myocardium", self)
         showMyocardium.setStatusTip("Show mycardial binary mask")
+        showMyocardium.triggered.connect(self.fig.show_myocardium)
 
         singularEndoDetection = QtGui.QAction("Singular", self)
         singularEndoDetection.setStatusTip("Detect endocardial border on the current slice")
@@ -108,8 +111,14 @@ class MainFrame(QtGui.QWidget):
     tmin, tmax = 0, 100 # index range [_tmin, _tmax) for t index in use
     zmin, zmax = 0, 100 # index range [_zmin, _zmax) for z index in use
 
-    cine_img = None
-    cine_mask = None
+    cine_img = None # original cine image
+
+    display_mode = None # "endocardial", "epicardial", myocardial"
+
+    cine_mask = None # temp
+    endocardial_mask = None # 4d numpy binary mask
+    epicardial_mask = None # 4d numpy binary mask
+    myocardial_mask = None # 4d numpy binary mask
 
     mask_slice = None
     img_slice = None
@@ -133,11 +142,15 @@ class MainFrame(QtGui.QWidget):
 
         self.fig1 = Figure(figsize=(6, 6), dpi=65)
         self.ax1 = self.fig1.add_subplot(111)
+        self.ax1.set_xlim([0, 256])
+        self.ax1.set_ylim([256, 0])
         self.canvas1 = FigureCanvas(self.fig1)
         self.canvas1.setParent(self)
 
         self.fig2 = Figure(figsize=(6, 6), dpi=65)
         self.ax2 = self.fig2.add_subplot(111)
+        self.ax2.set_xlim([0, 256])
+        self.ax2.set_ylim([256, 0])
         self.canvas2 = FigureCanvas(self.fig2)
         self.canvas2.setParent(self)
 
@@ -297,6 +310,14 @@ class MainFrame(QtGui.QWidget):
         self.tmax = self.tslicenum-1
         self.zmax = self.zslicenum-1
 
+
+        self.display_mode = "endocardial"
+        self.update_mask_title("Binary endocardial mask")
+        self.cine_mask = self.endocardial_mask
+        self.mask_slice = self.cine_mask[:, :, self.tidx, self.zidx]
+        self.redraw_mask()
+
+
         self.slider["tidx"].setRange(self.tmin, self.tmax)
         self.slider["zidx"].setRange(self.zmin, self.zmax)
         self.spinbox["tidx"].setRange(self.tmin, self.tmax)
@@ -338,6 +359,9 @@ class MainFrame(QtGui.QWidget):
         # add title widgets
         self.grid.addWidget(self.title["tslice"], 7, 0)
         self.grid.addWidget(self.title["zslice"], 8, 0)
+
+
+
 
         # update cc settings
         self.cc.reset_setting()
@@ -463,13 +487,22 @@ class MainFrame(QtGui.QWidget):
             print("Failed to load cine image")
             return
 
+        if(self.cine_img): del self.cine_img
+
         self.cine_img = temp
         self.loadflag = True
         self.cine_img = algorithm.resize(self.cine_img, mode=256)
 
         self.img_slice = self.cine_img[:, :, 0, 0]
-        self.cine_mask = np.zeros(self.cine_img.shape)
-        self.mask_slice = self.cine_mask[:, :, 0, 0]
+
+        if(self.endocardial_mask): del self.endocardial_mask
+        if(self.epicardial_mask): del self.epicardial_mask
+        if(self.myocardial_mask): del self.myocardial_mask
+
+        self.endocardial_mask = np.zeros(self.cine_img.shape)
+        self.epicardial_mask = np.zeros(self.cine_img.shape)
+        self.myocardial_mask = np.zeros(self.cine_img.shape)
+
         self.reset_setting()
 
         self.redraw()
@@ -498,6 +531,39 @@ class MainFrame(QtGui.QWidget):
         print(fname)
 
 
+    def show_endocardium(self):
+        self.display_mode = "endocardial"
+        self.update_mask_title("Binary endocardial mask")
+
+        self.cine_mask = self.endocardial_mask
+        self.mask_slice = self.cine_mask[:, :, self.tidx, self.zidx]
+
+        self.redraw_mask()
+        self.cc.switch2endo()
+
+
+    def show_epicardium(self):
+        self.display_mode = "epicardial"
+        self.update_mask_title("Binary epicardial mask")
+
+        self.cine_mask = self.epicardial_mask
+        self.mask_slice = self.cine_mask[:, :, self.tidx, self.zidx]
+
+        self.redraw_mask()
+        self.cc.switch2epic()
+
+
+    def show_myocardium(self):
+        self.display_mode = "myocardial"
+        self.update_mask_title("Binary myocardial mask")
+
+        self.cine_mask = self.myocardial_mask
+        self.mask_slice = self.cine_mask[:, :, self.tidx, self.zidx]
+
+        self.redraw_mask()
+        self.cc.switch2myo()
+
+
     def singular_endocardial_detection(self):
         if self.loadflag == False:
             return
@@ -505,7 +571,6 @@ class MainFrame(QtGui.QWidget):
         print("\nInitializing singular endocardial detection..... ", end="")
         self.cc.set_singular()
         self.cc.switch2seed()
-        # print("complete")
 
 
     def multiple_endocardial_detection(self):
@@ -515,7 +580,6 @@ class MainFrame(QtGui.QWidget):
         print("\nInitializing multiple endocardial detection..... ", end="")
         self.cc.set_multiple()
         self.cc.switch2seed()
-        # print("complete")
 
 
     def singular_epicardial_detection(self):
@@ -553,6 +617,9 @@ class ClickerClass(object):
     _epsilon = 5 # cursor sensitivity in pixels
     _modes = "init"
     # True: Place landmarks, False: Connect landmarks
+
+
+
     _alpha = 0.30
     _ind = None # active vertex
     _seed = None # seed point for endocardial detection
@@ -562,6 +629,11 @@ class ClickerClass(object):
 
     cine_img = None # 4d numpy array
     cine_mask = None # 4d numpy array
+
+    endo_mask = None
+    epic_mask = None
+    myoc_mask = None
+
     mask_slice = None # active mask slice
     cropped = None # 4d numpy array
 
@@ -570,7 +642,11 @@ class ClickerClass(object):
     plot = None
     poly = None
     verts = None # active position: verts[_tidx][_zidx]
-    position = None
+    position = None # active position set
+
+    endo_position = None
+    epic_position = None
+
     background = None
 
 
@@ -614,7 +690,10 @@ class ClickerClass(object):
         zl = self.cine_mask.shape[3]
 
         # access: position[tl][zl]
-        self.position = [[[] for i in range(zl)] for j in range(tl)]
+        self.endo_position = [[[] for i in range(zl)] for j in range(tl)]
+        self.epic_position = [[[] for i in range(zl)] for j in range(tl)]
+
+        self.position = self.endo_position
         self.verts = self.position[self._tidx][self._zidx]
 
         # access: _seed[tl][zl]
@@ -624,12 +703,12 @@ class ClickerClass(object):
     def init_img(self):
         self.cine_img = self.Window.cine_img
         self._loadflag = True
+        self.cropped = np.zeros((self.cine_img.shape[2], self.cine_img.shape[3]))
 
 
     def init_mask(self):
         self.cine_mask = self.Window.cine_mask
         self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
-        self.cropped = np.zeros((self.cine_mask.shape[2], self.cine_mask.shape[3]))
 
 
     def reset_setting(self):
@@ -649,6 +728,49 @@ class ClickerClass(object):
         self.init_mask()
         self.init_img()
         self.init_vertex()
+
+
+    def switch2endo(self):
+        self.position = self.endo_position
+        self.verts = self.position[self._tidx][self._zidx]
+        self.init_mask()
+
+        if self._modes == "connect":
+            if len(self.verts) <= 1:
+                self.switch_modes()
+            else:
+                self.poly.xy = np.array(self.verts[:])
+                self.line.set_data(zip(*self.poly.xy))
+        elif self._modes == "plot":
+            self.replot()
+            self.poly.xy = [(0, 0)]
+
+        if self._modes != "seed":
+            self.redraw()
+            self.canvas1.draw()
+
+
+    def switch2epic(self):
+        self.position = self.epic_position
+        self.verts = self.position[self._tidx][self._zidx]
+        self.init_mask()
+
+        if self._modes == "connect":
+            if len(self.verts) <= 1:
+                self.switch_modes()
+            else:
+                self.poly.xy = np.array(self.verts[:])
+                self.line.set_data(zip(*self.poly.xy))
+        elif self._modes == "plot":
+            self.replot()
+            self.poly.xy = [(0, 0)]
+
+        self.redraw()
+        self.canvas1.draw()
+
+    def switch2myo(self):
+        self.cine_mask = self.Window.cine_mask
+        self.init_mask()
 
 
     def update_index(self, tidx, zidx):
@@ -725,10 +847,15 @@ class ClickerClass(object):
     def switch2seed(self):
         self._modes = "seed"
         self.Window.update_image_title(self._title[self._modes])
+        if self.Window.display_mode != "endocardial":
+            self.Window.show_endocardium()
 
         # access: _seed[tl][zl]
         # self._seed = [[[] for i in range(zl)] for j in range(tl)]
         self._tseed.clear()
+        if len(self._seed[self._tidx][self._zidx]) == 1:
+            self._tseed.append((self._seed[self._tidx][self._zidx][0][0],\
+                                self._seed[self._tidx][self._zidx][0][1]))
 
         # clears the existing plot
         self.replot()
@@ -1089,8 +1216,6 @@ class ClickerClass(object):
         print(" complete")
         print("Successfully segmented {} slices out of {}".format(success_cnt, tot_cnt))
         if(success_cnt != tot_cnt):
-            #pp = pprint.PrettyPrinter(indent=4)
-            #pp.pprint(failed_index)
             print("failed on: ")
             print(failed_index)
         del failed_index
@@ -1110,6 +1235,7 @@ class ClickerClass(object):
 
 
     def singular_epicardial_detection(self):
+
         pass
 
 
