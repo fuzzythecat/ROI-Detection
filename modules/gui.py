@@ -170,11 +170,11 @@ class MainFrame(QtGui.QWidget):
 
     def set_title(self):
 
-        self.title["cineimg"] = QtGui.QLabel("Cine image")
+        self.title["cineimg"] = QtGui.QLabel("Cine image\n")
         self.title["cineimg"].setStyleSheet("font: bold")
         self.title["cineimg"].setAlignment(QtCore.Qt.AlignCenter)
 
-        self.title["maskimg"] = QtGui.QLabel("Binary mask")
+        self.title["maskimg"] = QtGui.QLabel("Binary mask\n")
         self.title["maskimg"].setStyleSheet("font: bold")
         self.title["maskimg"].setAlignment(QtCore.Qt.AlignCenter)
 
@@ -360,9 +360,6 @@ class MainFrame(QtGui.QWidget):
         self.grid.addWidget(self.title["tslice"], 7, 0)
         self.grid.addWidget(self.title["zslice"], 8, 0)
 
-
-
-
         # update cc settings
         self.cc.reset_setting()
 
@@ -397,24 +394,28 @@ class MainFrame(QtGui.QWidget):
 
 
     def update_tidx(self, value):
-        if self.loadflag == True:
-            self.tidx = value
-            self.update_slice()
+        if self.loadflag != True:
+            return
+        self.tidx = value
+        self.update_slice()
 
-            self.cc.update_index(self.tidx, self.zidx)
-            self.redraw_img()
+        self.cc.update_index(self.tidx, self.zidx)
+        self.redraw_img()
 
 
     def update_zidx(self, value):
-        if self.loadflag == True:
-            self.zidx = value
-            self.update_slice()
+        if self.loadflag != True:
+            return
+        self.zidx = value
+        self.update_slice()
 
-            self.cc.update_index(self.tidx, self.zidx)
-            self.redraw_img()
+        self.cc.update_index(self.tidx, self.zidx)
+        self.redraw_img()
 
 
     def update_tmin(self, value):
+        if self.loadflag != True:
+            return
         self.tmin = value
         self.spinbox["tmin"].setValue(value)
         self.spinbox["tmin"].setRange(0, self.tmax-1)
@@ -426,6 +427,8 @@ class MainFrame(QtGui.QWidget):
 
 
     def update_tmax(self, value):
+        if self.loadflag != True:
+            return
         self.tmax = value
         self.spinbox["tmax"].setValue(value)
         self.spinbox["tmax"].setRange(self.tmin+1, self.tslicenum-1)
@@ -437,6 +440,8 @@ class MainFrame(QtGui.QWidget):
 
 
     def update_zmin(self, value):
+        if self.loadflag != True:
+            return
         self.zmin = value
         self.spinbox["zmin"].setValue(value)
         self.spinbox["zmin"].setRange(0, self.zmax-1)
@@ -448,6 +453,8 @@ class MainFrame(QtGui.QWidget):
 
 
     def update_zmax(self, value):
+        if self.loadflag != True:
+            return
         self.zmax = value
         self.spinbox["zmax"].setValue(value)
         self.spinbox["zmax"].setRange(self.zmin+1, self.zslicenum-1)
@@ -490,7 +497,6 @@ class MainFrame(QtGui.QWidget):
         if(self.cine_img): del self.cine_img
 
         self.cine_img = temp
-        self.loadflag = True
         self.cine_img = algorithm.resize(self.cine_img, mode=256)
 
         self.img_slice = self.cine_img[:, :, 0, 0]
@@ -504,6 +510,7 @@ class MainFrame(QtGui.QWidget):
         self.myocardial_mask = np.zeros(self.cine_img.shape)
 
         self.reset_setting()
+        self.loadflag = True
 
         self.redraw()
 
@@ -532,8 +539,12 @@ class MainFrame(QtGui.QWidget):
 
 
     def show_endocardium(self):
+        if self.loadflag != True:
+            return
+
         self.display_mode = "endocardial"
-        self.update_mask_title("Binary endocardial mask")
+        self.update_mask_title("Binary endocardial mask\n")
+        print("\nDisplaying endocardium")
 
         self.cine_mask = self.endocardial_mask
         self.mask_slice = self.cine_mask[:, :, self.tidx, self.zidx]
@@ -543,8 +554,12 @@ class MainFrame(QtGui.QWidget):
 
 
     def show_epicardium(self):
+        if self.loadflag != True:
+            return
+
         self.display_mode = "epicardial"
-        self.update_mask_title("Binary epicardial mask")
+        self.update_mask_title("Binary epicardial mask\n")
+        print("\nDisplaying epicardium")
 
         self.cine_mask = self.epicardial_mask
         self.mask_slice = self.cine_mask[:, :, self.tidx, self.zidx]
@@ -554,8 +569,13 @@ class MainFrame(QtGui.QWidget):
 
 
     def show_myocardium(self):
+        if self.loadflag != True:
+            return
+
         self.display_mode = "myocardial"
-        self.update_mask_title("Binary myocardial mask")
+        self.update_mask_title("Binary myocardial mask\n")
+        self.update_image_title("Cine image\n")
+        print("\nDisplaying myocardium")
 
         self.cine_mask = self.myocardial_mask
         self.mask_slice = self.cine_mask[:, :, self.tidx, self.zidx]
@@ -565,7 +585,7 @@ class MainFrame(QtGui.QWidget):
 
 
     def singular_endocardial_detection(self):
-        if self.loadflag == False:
+        if self.loadflag != True:
             return
 
         print("\nInitializing singular endocardial detection..... ", end="")
@@ -574,7 +594,7 @@ class MainFrame(QtGui.QWidget):
 
 
     def multiple_endocardial_detection(self):
-        if self.loadflag == False:
+        if self.loadflag != True:
             return
 
         print("\nInitializing multiple endocardial detection..... ", end="")
@@ -583,7 +603,7 @@ class MainFrame(QtGui.QWidget):
 
 
     def singular_epicardial_detection(self):
-        if self.loadflag == False:
+        if self.loadflag != True:
             return
 
         self.cc.set_singular()
@@ -591,7 +611,7 @@ class MainFrame(QtGui.QWidget):
 
 
     def multiple_epicardial_detection(self):
-        if self.loadflag == False:
+        if self.loadflag != True:
             return
 
         self.cc.set_multiple()
@@ -617,8 +637,6 @@ class ClickerClass(object):
     _epsilon = 5 # cursor sensitivity in pixels
     _modes = "init"
     # True: Place landmarks, False: Connect landmarks
-
-
 
     _alpha = 0.30
     _ind = None # active vertex
@@ -765,12 +783,27 @@ class ClickerClass(object):
             self.replot()
             self.poly.xy = [(0, 0)]
 
-        self.redraw()
-        self.canvas1.draw()
+        if self._modes != "seed":
+            self.redraw()
+            self.canvas1.draw()
+
 
     def switch2myo(self):
         self.cine_mask = self.Window.cine_mask
+        self.position = []
+        self.verts = []
+
         self.init_mask()
+        if self._modes == "connect":
+            self.poly.xy = [(0, 0)]
+            self.line.set_data(zip(*self.poly.xy))
+        elif self._modes == "plot":
+            self.replot()
+            self.poly.xy = [(0, 0)]
+
+        if self._modes != "seed":
+            self.redraw()
+            self.canvas1.draw()
 
 
     def update_index(self, tidx, zidx):
@@ -816,7 +849,10 @@ class ClickerClass(object):
 
 
     def switch_slice(self):
-        self.verts = self.position[self._tidx][self._zidx]
+        if self.Window.display_mode == "myocardial":
+            self.verts = []
+        else:
+            self.verts = self.position[self._tidx][self._zidx]
         self.mask_slice = self.cine_mask[:, :, self._tidx, self._zidx]
         self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
 
@@ -836,6 +872,7 @@ class ClickerClass(object):
 
     def switch_modes(self):
         if not self._loadflag: return
+        if self.Window.display_mode == "myocardial": return
         if self._modes == "seed": return
 
         if self._modes == "plot":
@@ -898,6 +935,7 @@ class ClickerClass(object):
     def button_press_callback(self, event):
         if not event.inaxes: return
         if not self._loadflag: return
+        if self.Window.display_mode == "myocardial": return
 
         self._ind = self.get_nearest_vertex_idx(event)
         # Do whichever action corresponds to the mouse button clicked
@@ -912,12 +950,14 @@ class ClickerClass(object):
 
     def button_release_callback(self, event):
         if not self._loadflag: return
+        if self.Window.display_mode == "myocardial": return
 
         self._ind = None
 
 
     def scroll_callback(self, event):
         if not self._loadflag: return
+        if self.Window.display_mode == "myocardial": return
         if not self._modes == "connect": return
 
         if event.button == 'up':
@@ -939,6 +979,7 @@ class ClickerClass(object):
         if not self._loadflag: return
         if event.button != 1: return
         if not event.inaxes: return
+        if self.Window.display_mode == "myocardial": return
 
         self.move_vertex_to(event)
         self.canvas1.restore_region(self.background)
@@ -957,6 +998,7 @@ class ClickerClass(object):
     def key_press_callback(self, event):
         if not self._loadflag: return
         if not event.inaxes: return
+        if self.Window.display_mode == "myocardial": return
 
         if event.key == 't':
             pass
