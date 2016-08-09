@@ -1,3 +1,52 @@
+def epicardial_detection(img, seed):
+    """
+    Wrapper function for SimpleITK image segmetation.
+    Detect and crop binary mask from image from given seed point.
+
+    Parameters
+    ----------
+    img : 2-dimensional numpy array image
+
+    seed : [(x, y)] 2-dimensional binary mask to run segmentation from
+
+    Returns
+    -------
+    seg_arr : 2-dimensional numpy array binary mask
+    """
+    import SimpleITK as sitk
+
+    img_itk = sitk.GetImageFromArray(img)
+
+    seg = sitk.Image(img_itk.GetSize(), sitk.sitkUInt8)
+    seg.CopyInformation(img_itk)
+
+    for x in range(seed.shape[0]):
+        for y in range(seed.shape[1]):
+            if seed[x][y] > 0.0:
+                seg[(y, x)] = 1
+
+    seg = sitk.BinaryDilate(seg, 3)
+
+    lower_threshold = 150.
+    upper_threshold = 300.
+    init_ls = sitk.SignedMaurerDistanceMap(seg, \
+                     insideIsPositive=True, useImageSpacing=True)
+
+    lsFilter = sitk.ThresholdSegmentationLevelSetImageFilter()
+    lsFilter.SetLowerThreshold(lower_threshold)
+    lsFilter.SetUpperThreshold(upper_threshold)
+    lsFilter.SetMaximumRMSError(0.02)
+    lsFilter.SetNumberOfIterations(500)
+    lsFilter.SetCurvatureScaling(1)
+    lsFilter.SetPropagationScaling(1)
+    lsFilter.ReverseExpansionDirectionOn()
+    ls = lsFilter.Execute(init_ls, sitk.Cast(img_itk, sitk.sitkFloat32))
+
+    seg_arr = sitk.GetArrayFromImage(ls)
+
+    return seg_arr
+
+
 def endocardial_detection(img, seed):
     """
     Wrapper function for SimpleITK image segmetation.
