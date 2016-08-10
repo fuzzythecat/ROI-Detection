@@ -494,8 +494,6 @@ class MainFrame(QtGui.QWidget):
             print("Failed to load cine image")
             return
 
-        if(self.cine_img): del self.cine_img
-
         self.cine_img = temp
         self.cine_img = algorithm.resize(self.cine_img, mode=256)
 
@@ -606,8 +604,18 @@ class MainFrame(QtGui.QWidget):
         if self.loadflag != True:
             return
 
-        self.cc.set_singular()
-        print("sin_epi")
+        print("\nInitializing singular epicardial detection..... ", end="")
+
+        # check if mask set.
+        if self.cc.cropped[self.tidx][self.zidx] != True:
+            print("endocardinal mask must be set")
+            return
+
+        print("complete")
+
+        self.cc.singular_epicardial_detection()
+
+        # self.cc.switch2epic()
 
 
     def multiple_epicardial_detection(self):
@@ -647,10 +655,6 @@ class ClickerClass(object):
 
     cine_img = None # 4d numpy array
     cine_mask = None # 4d numpy array
-
-    endo_mask = None
-    epic_mask = None
-    myoc_mask = None
 
     mask_slice = None # active mask slice
     cropped = None # 4d numpy array
@@ -1028,10 +1032,11 @@ class ClickerClass(object):
                 else:
                     self.mask_slice[y][x] = 0
 
-        if(len(self.verts) > 2):
-            self.cropped[self._tidx][self._zidx] = True
-        else:
-            self.cropped[self._tidx][self._zidx] = False
+        if(self.Window.display_mode == "endocardial"):
+            if(len(self.verts) > 2):
+                self.cropped[self._tidx][self._zidx] = True
+            else:
+                self.cropped[self._tidx][self._zidx] = False
 
         self.ax2.imshow(self.mask_slice, cmap=plt.cm.gray)
         self.canvas2.draw()
@@ -1119,8 +1124,8 @@ class ClickerClass(object):
             return
 
         print("complete",
-              "\nseed set at", (self._tseed[0][0], \
-                              self._tseed[0][1]),
+              "\nseed set at",
+              (self._tseed[0][0],self._tseed[0][1]),
               "\nsegmenting mask..... ", end="")
 
         self.mask_slice[:, :] = \
@@ -1154,7 +1159,6 @@ class ClickerClass(object):
             self.switch2plot()
             self.cropped[self._tidx][self._zidx] = False
 
-        # self._seed = []
         self.canvas1.draw()
 
 
@@ -1277,8 +1281,45 @@ class ClickerClass(object):
 
 
     def singular_epicardial_detection(self):
+        print("using endocardial mask as seed")
+        print("segmenting mask..... ", end="")
 
-        pass
+        epi_mask = self.Window.epicardial_mask
+        endo_mask = self.Window.endocardial_mask
+
+        self.position = self.epic_position
+        self.verts = self.position[self._tidx][self._zidx]
+
+        epi_slice = epi_mask[:, :, self._tidx, self._zidx]
+        endo_slice = endo_mask[:, :, self._tidx, self._zidx]
+
+        epi_slice[:, :] = \
+                    algorithm.epicardial_detection(
+                    self.cine_img[:, :, self._tidx, self._zidx], \
+                    endo_slice)[:, :]
+
+        # if valid mask
+        if int(np.sum(epi_slice)) != 0:
+
+            print("complete")
+            print("calculating hull..... ", end="")
+
+            try:
+                self.verts[:] = algorithm.convex_hull(epi_slice)
+            except:
+                print("failure")
+                return
+
+            self.poly.xy = np.array(self.position[self._tidx][self._zidx])
+            for x in range(epi_slice.shape[1]):
+                for y in range(epi_slice.shape[0]):
+                    if self.poly.get_path().contains_point((x,y)):
+                        epi_slice[y][x] = 1
+                    else:
+                        epi_slice[y][x] = 0
+
+            print("complete")
+            self.Window.show_epicardium()
 
 
     def multiple_epicardial_detection(self):
