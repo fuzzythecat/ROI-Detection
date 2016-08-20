@@ -622,8 +622,11 @@ class MainFrame(QtGui.QWidget):
         if self.loadflag != True:
             return
 
-        self.cc.set_multiple()
-        print("com_epi")
+        print("\nInitializing multiple epicardial detection..... ", end="")
+        print("complete")
+
+        self.cc.multiple_epicardial_detection()
+
 
 
 class ClickerClass(object):

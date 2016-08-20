@@ -18,6 +18,9 @@ temp/
 # C extensions
 *.so
 
+# C tags
+tags
+
 # pyenv
 .python-version
 

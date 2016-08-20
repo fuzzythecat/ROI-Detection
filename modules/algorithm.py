@@ -27,17 +27,17 @@ def epicardial_detection(img, seed):
 
     seg = sitk.BinaryDilate(seg, 3)
 
-    lower_threshold = 150.
-    upper_threshold = 300.
+    lower_threshold = 50
+    upper_threshold = 350
     init_ls = sitk.SignedMaurerDistanceMap(seg, \
-                     insideIsPositive=True, useImageSpacing=True)
+                     insideIsPositive=True, useImageSpacing=False)
 
     lsFilter = sitk.ThresholdSegmentationLevelSetImageFilter()
     lsFilter.SetLowerThreshold(lower_threshold)
     lsFilter.SetUpperThreshold(upper_threshold)
     lsFilter.SetMaximumRMSError(0.02)
-    lsFilter.SetNumberOfIterations(500)
-    lsFilter.SetCurvatureScaling(1)
+    lsFilter.SetNumberOfIterations(80)
+    lsFilter.SetCurvatureScaling(.5)
     lsFilter.SetPropagationScaling(1)
     lsFilter.ReverseExpansionDirectionOn()
     ls = lsFilter.Execute(init_ls, sitk.Cast(img_itk, sitk.sitkFloat32))
