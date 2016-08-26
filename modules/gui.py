@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pprint
+import pickle
 
 from matplotlib import use
 use("Qt4Agg")
@@ -12,10 +13,12 @@ from matplotlib.mlab import dist_point_to_segment
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt4 import QtCore
 from PyQt4 import QtGui
+from copy import deepcopy
+from scipy.ndimage.measurements import center_of_mass
 
 from modules import io
 from modules import algorithm
-
+from modules import conf
 
 class MainWindow(QtGui.QMainWindow):
 
@@ -499,9 +502,9 @@ class MainFrame(QtGui.QWidget):
 
         self.img_slice = self.cine_img[:, :, 0, 0]
 
-        if(self.endocardial_mask): del self.endocardial_mask
-        if(self.epicardial_mask): del self.epicardial_mask
-        if(self.myocardial_mask): del self.myocardial_mask
+        if(self.endocardial_mask != None): del self.endocardial_mask
+        if(self.epicardial_mask != None): del self.epicardial_mask
+        if(self.myocardial_mask != None): del self.myocardial_mask
 
         self.endocardial_mask = np.zeros(self.cine_img.shape)
         self.epicardial_mask = np.zeros(self.cine_img.shape)
@@ -529,11 +532,51 @@ class MainFrame(QtGui.QWidget):
 
 
     def save_img(self):
-        if self._loadflag == False:
+        if self.loadflag == False:
             return
 
         fname = io.save_file_dialog()
-        print(fname)
+        data = conf.MaskIoFormat()
+
+        tmax = self.cine_img.shape[2]
+        zmax = self.cine_img.shape[3]
+
+        COM = []
+        frame_idx = []
+        slice_idx = []
+
+        emask = []
+        boxmask = []
+        cinedata = []
+
+        cnt = 0
+        for t in range(tmax):
+            for z in range(zmax):
+                if self.cc.cropped[t][z]:
+                    cnt += 1
+                    ori_img = deepcopy(self.cine_img[:,:,t,z])
+                    bmask = deepcopy(self.endocardial_mask[:,:,t,z])
+                    com = center_of_mass(bmask)
+                    xmask = algorithm.c2bmask(bmask, com)
+
+                    COM.append(com)
+                    frame_idx.append(t)
+                    slice_idx.append(z)
+                    emask.append(bmask)
+                    cinedata.append(ori_img)
+                    boxmask.append(xmask)
+
+        data.box_mask = boxmask
+        data.cine_data = cinedata
+        data.COM = COM
+        data.endocardial_mask = emask
+        data.frame_idx = frame_idx
+        data.slice_idx = slice_idx
+
+        with open(fname, 'wb') as output:
+            pickle.dump(data, output, pickle.HIGHEST_PROTOCOL)
+
+        print("data saved at :", fname)
 
 
     def show_endocardium(self):
@@ -604,6 +647,8 @@ class MainFrame(QtGui.QWidget):
         if self.loadflag != True:
             return
 
+        print("disabled")
+        return
         print("\nInitializing singular epicardial detection..... ", end="")
 
         # check if mask set.
@@ -621,6 +666,9 @@ class MainFrame(QtGui.QWidget):
     def multiple_epicardial_detection(self):
         if self.loadflag != True:
             return
+
+        print("disabled")
+        return
 
         print("\nInitializing multiple epicardial detection..... ", end="")
         print("complete")

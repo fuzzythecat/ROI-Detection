@@ -303,6 +303,24 @@ def normalize(img):
         return _img_rescale(ret)
 
 
+def c2bmask(img, center):
+    from numpy import zeros
+    #derive boxed mask from circular mask
 
 
+    xmin = int(center[0])-48
+    xmax = int(center[0])+48
+    ymin = int(center[1])-48
+    ymax = int(center[1])+48
 
+    if(xmin < 0): xmin = 0
+    if(ymin < 0): ymin = 0
+    if(xmax > 256): xmax = 256
+    if(ymax > 256): ymax = 256
+
+    ret = zeros(img.shape)
+    for x in range(xmin, xmax):
+        for y in range(ymin, ymax):
+            ret[x][y] = 1
+
+    return ret

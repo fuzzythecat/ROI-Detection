@@ -29,3 +29,25 @@ save_options["defaultextension"] = ".npy"
 save_options["title"] = "save mask"
 
 
+class MaskIoFormat(object):
+    COM = None
+    # list of Center of Mass coordinates
+    # (y, x)
+
+    frame_idx = None
+    # list of frame(time) indices
+
+    slice_idx = None
+    # list of slice(z) indices
+
+    endocardial_mask = None
+    # list of numpy binary mask
+
+    box_mask = None
+    # list of numpy box-shapeed binary mask
+
+    cine_data = None
+    # list of 2d-original image slice
+
+    def __init__(self):
+        print("Initiating Data Save routine")
