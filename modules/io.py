@@ -2,6 +2,36 @@ import os
 import sys
 from modules import conf
 
+
+def init_mask_io_format(**kwargs):
+    """
+    initiates and returns a dictionary
+    mask instance of ROI-IO format.
+
+    The following keys in the dictionary represent:
+    COM : A list of Center Of Mass of each 2-d image slice.
+    frame_idx : A list of frame(time) indices.
+    slice_idx : A list of slicie(z) indices.
+    endocardial_mask : A list of 2-d numpy binary mask.
+    box_mask : A list of numpy box-shaped binary mask
+    cine_data : A list of 2-d original image slice
+
+    Returns
+    -------
+    data : A dictionary instance of ROI-IO format.
+    """
+    data = {
+        "COM": [],
+        "frame_idx": [],
+        "slice_idx": [],
+        "slice_idx": [],
+        "endocardial_mask": [],
+        "box_mask": [],
+        "cine_data": []}
+
+    return data
+
+
 def load_cine_from_directory(cinedir):
     """
     Integrates 2-dimensional dicom slices from cine directory

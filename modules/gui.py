@@ -536,7 +536,7 @@ class MainFrame(QtGui.QWidget):
             return
 
         fname = io.save_file_dialog()
-        data = conf.MaskIoFormat()
+        data = io.init_mask_io_format()
 
         tmax = self.cine_img.shape[2]
         zmax = self.cine_img.shape[3]
@@ -566,12 +566,12 @@ class MainFrame(QtGui.QWidget):
                     cinedata.append(ori_img)
                     boxmask.append(xmask)
 
-        data.box_mask = boxmask
-        data.cine_data = cinedata
-        data.COM = COM
-        data.endocardial_mask = emask
-        data.frame_idx = frame_idx
-        data.slice_idx = slice_idx
+        data["box_mask"] = boxmask
+        data["cine_data"] = cinedata
+        data["COM"] = COM
+        data["endocardial_mask"] = emask
+        data["frame_idx"] = frame_idx
+        data["slice_idx"] = slice_idx
 
         with open(fname, 'wb') as output:
             pickle.dump(data, output, pickle.HIGHEST_PROTOCOL)
