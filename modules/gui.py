@@ -125,6 +125,7 @@ class MainFrame(QtGui.QWidget):
 
     mask_slice = None
     img_slice = None
+    subject_idx = ""
 
     # gui-variables
     btn = {}
@@ -396,6 +397,14 @@ class MainFrame(QtGui.QWidget):
         self.grid.addWidget(self.title["maskimg"], 0, 2, 2, 2)
 
 
+    def update_subject_idx(self, idx):
+        if self.loadflag != True:
+            return
+
+        self.subject_idx = idx
+        self.cc.update_subject_idx(idx)
+
+
     def update_tidx(self, value):
         if self.loadflag != True:
             return
@@ -497,6 +506,7 @@ class MainFrame(QtGui.QWidget):
             print("Failed to load cine image")
             return
 
+
         self.cine_img = temp
         self.cine_img = algorithm.resize(self.cine_img, mode=256)
 
@@ -513,6 +523,9 @@ class MainFrame(QtGui.QWidget):
         self.reset_setting()
         self.loadflag = True
 
+        subject_idx = dirname.split('/')[-1]
+        self.update_subject_idx(subject_idx)
+        
         self.redraw()
 
 
@@ -548,6 +561,7 @@ class MainFrame(QtGui.QWidget):
         emask = []
         boxmask = []
         cinedata = []
+        subject_idx = []
 
         cnt = 0
         for t in range(tmax):
@@ -565,6 +579,7 @@ class MainFrame(QtGui.QWidget):
                     emask.append(bmask)
                     cinedata.append(ori_img)
                     boxmask.append(xmask)
+                    subject_idx.append(self.subject_idx)
 
         data["box_mask"] = boxmask
         data["cine_data"] = cinedata
@@ -572,6 +587,7 @@ class MainFrame(QtGui.QWidget):
         data["endocardial_mask"] = emask
         data["frame_idx"] = frame_idx
         data["slice_idx"] = slice_idx
+        data["subject_idx"] = subject_idx
 
         with open(fname, 'wb') as output:
             pickle.dump(data, output, pickle.HIGHEST_PROTOCOL)
@@ -691,6 +707,7 @@ class ClickerClass(object):
     _tmin, _tmax = 0, 100 # index range [_tmin, _tmax] for detection
     _zmin, _zmax = 0, 100 # index range [_zmin, _zmax] for detection
 
+    _subject_idx = ""
     _loadflag = False
     _detectionflag = None
     _epsilon = 5 # cursor sensitivity in pixels
@@ -859,6 +876,10 @@ class ClickerClass(object):
         if self._modes != "seed":
             self.redraw()
             self.canvas1.draw()
+
+
+    def update_subject_idx(self, idx):
+        self._subject_idx = idx
 
 
     def update_index(self, tidx, zidx):

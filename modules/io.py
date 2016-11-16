@@ -27,7 +27,8 @@ def init_mask_io_format(**kwargs):
         "slice_idx": [],
         "endocardial_mask": [],
         "box_mask": [],
-        "cine_data": []}
+        "cine_data": [],
+        "subject_idx": []}
 
     return data
 
