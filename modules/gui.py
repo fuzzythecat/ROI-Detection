@@ -524,8 +524,8 @@ class MainFrame(QtGui.QWidget):
         self.reset_setting()
         self.loadflag = True
 
-        os = platform.system()
-        is_windows = (os.lower().find("win") > -1)
+        osname = platform.system()
+        is_windows = (osname.lower().find("win") > -1)
         if is_windows:
             subject_idx = dirname.split('\\')[-1]
         else:
