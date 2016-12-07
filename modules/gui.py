@@ -523,15 +523,18 @@ class MainFrame(QtGui.QWidget):
 
         self.reset_setting()
         self.loadflag = True
-
+        
+        '''
         osname = platform.system()
         is_windows = (osname.lower().find("win") > -1)
         if is_windows:
             subject_idx = dirname.split('\\')[-1]
         else:
             subject_idx = dirname.split('/')[-1]
+        '''
+        subject_idx = dirname.replace('\\','/').split('/')[-1] 
         self.update_subject_idx(subject_idx)
-        
+
         self.redraw()
 
 
