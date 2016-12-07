@@ -206,7 +206,11 @@ class MainFrame(QtGui.QWidget):
         self.title["zmin"] = QtGui.QLabel("Z minimum: ")
         self.title["zmin"].setStyleSheet("font: bold")
         self.title["zmin"].setAlignment(QtCore.Qt.AlignCenter)
-
+        
+        self.title["dir"] = QtGui.QLabel("No directory chosen")
+        self.title["dir"].setStyleSheet("font: bold")
+        #self.title["dir"].setAlignment(QtCore.Qt.AlignCenter)
+ 
 
     def set_slider(self):
         # slides on the time-axis
@@ -288,6 +292,7 @@ class MainFrame(QtGui.QWidget):
         self.grid.addWidget(self.title["tmax"], 9, 2)
         self.grid.addWidget(self.title["zmin"], 10, 0)
         self.grid.addWidget(self.title["zmax"], 10, 2)
+        self.grid.addWidget(self.title["dir"], 11, 0, 1, 4)
 
         # add sliders
         self.grid.addWidget(self.slider["tidx"], 7, 2, 1, 2)
@@ -368,7 +373,22 @@ class MainFrame(QtGui.QWidget):
         # update cc settings
         self.cc.reset_setting()
 
+    
+    def update_cwd(self, title):
+        # update current working directory
+        self.grid.removeWidget(self.title["dir"])
+        self.title["dir"].deleteLater()
+        del self.title["dir"]
 
+        # set new titles
+        self.title["dir"] = QtGui.QLabel(title)
+        self.title["dir"].setStyleSheet("font: bold")
+        #self.title["dir"].setAlignment(QtCore.Qt.AlignCenter)
+
+        # add title widgets
+        self.grid.addWidget(self.title["dir"], 11, 0, 1, 4)
+
+       
     def update_image_title(self, title):
         # update slider titles to fit current slicenums
         self.grid.removeWidget(self.title["cineimg"])
@@ -523,15 +543,9 @@ class MainFrame(QtGui.QWidget):
 
         self.reset_setting()
         self.loadflag = True
-        
-        '''
-        osname = platform.system()
-        is_windows = (osname.lower().find("win") > -1)
-        if is_windows:
-            subject_idx = dirname.split('\\')[-1]
-        else:
-            subject_idx = dirname.split('/')[-1]
-        '''
+       
+        self.update_cwd(dirname)
+
         subject_idx = dirname.replace('\\','/').split('/')[-1] 
         self.update_subject_idx(subject_idx)
 
