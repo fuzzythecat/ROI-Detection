@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pprint
 import pickle
+import platform 
 
 from matplotlib import use
 use("Qt4Agg")
@@ -523,7 +524,12 @@ class MainFrame(QtGui.QWidget):
         self.reset_setting()
         self.loadflag = True
 
-        subject_idx = dirname.split('/')[-1]
+        os = platform.system()
+        is_windows = (os.lower().find("win") > -1)
+        if is_windows:
+            subject_idx = dirname.split('\\')[-1]
+        else:
+            subject_idx = dirname.split('/')[-1]
         self.update_subject_idx(subject_idx)
         
         self.redraw()
